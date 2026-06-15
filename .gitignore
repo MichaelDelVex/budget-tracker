@@ -1,6 +1,7 @@
 # Java
 backend/target/
-backend/data/
+backend/data/*
+!backend/data/.gitkeep
 
 # Node
 frontend/node_modules/

@@ -26,6 +26,18 @@ This project starts as a single-user local application. The backend owns data ac
 
 SQLite is configured as the local database at `backend/data/budget-tracker.sqlite`. The `backend/data/` folder is ignored by Git so local budget data is not committed.
 
+Database schema changes are managed with Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the schema at startup, but Flyway owns creating and changing tables.
+
+The database foundation currently includes:
+
+- Accounts
+- Categories
+- Tags
+- Categorisation rules
+- Import batches
+
+Default income and expense categories are seeded by migration so a fresh local database starts with useful category options.
+
 The first API slice is a health endpoint:
 
 ```http
@@ -94,6 +106,8 @@ npm run build
 ## API Testing
 
 Import `postman/budget-tracker.postman_collection.json` into Postman. The collection includes a `baseUrl` variable set to `http://localhost:8080`.
+
+Phase 2 adds database schema and seed data only. The public API surface is still the health endpoint.
 
 ## CI
 

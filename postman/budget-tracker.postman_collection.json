@@ -1,6 +1,7 @@
 {
   "info": {
     "name": "Budget Tracker API",
+    "description": "Local Budget Tracker API collection. Phase 2 adds the database foundation; the public API currently exposes health only.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
