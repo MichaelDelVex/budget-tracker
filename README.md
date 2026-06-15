@@ -52,6 +52,26 @@ Expected response:
 }
 ```
 
+Account CRUD endpoints:
+
+```http
+GET /api/accounts
+GET /api/accounts/{id}
+POST /api/accounts
+PUT /api/accounts/{id}
+DELETE /api/accounts/{id}
+```
+
+Create/update request body:
+
+```json
+{
+  "name": "Everyday",
+  "bank": "Example Bank",
+  "accountType": "CHECKING"
+}
+```
+
 ## Run Locally
 
 Requirements:
@@ -107,7 +127,7 @@ npm run build
 
 Import `postman/budget-tracker.postman_collection.json` into Postman. The collection includes a `baseUrl` variable set to `http://localhost:8080`.
 
-Phase 2 adds database schema and seed data only. The public API surface is still the health endpoint.
+The collection includes health and account CRUD requests.
 
 ## CI
 

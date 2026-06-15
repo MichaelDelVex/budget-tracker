@@ -11,9 +11,9 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.math.BigDecimal;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "account")
@@ -30,27 +30,29 @@ public class Account {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AccountType type;
+    @Column(name = "account_type", nullable = false)
+    private AccountType accountType;
 
-    @NotNull
-    @Column(name = "opening_balance", nullable = false)
-    private BigDecimal openingBalance = BigDecimal.ZERO;
-
+    @NotBlank
+    @Size(max = 120)
     @Column(nullable = false)
-    private boolean active = true;
+    private String bank;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
     protected Account() {
     }
 
-    public Account(String name, AccountType type, BigDecimal openingBalance) {
+    public Account(String name, String bank, AccountType accountType) {
         this.name = name;
-        this.type = type;
-        this.openingBalance = openingBalance;
+        this.bank = bank;
+        this.accountType = accountType;
     }
 
     public Integer getId() {
@@ -61,19 +63,25 @@ public class Account {
         return name;
     }
 
-    public AccountType getType() {
-        return type;
+    public AccountType getAccountType() {
+        return accountType;
     }
 
-    public BigDecimal getOpeningBalance() {
-        return openingBalance;
-    }
-
-    public boolean isActive() {
-        return active;
+    public String getBank() {
+        return bank;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void update(String name, String bank, AccountType accountType) {
+        this.name = name;
+        this.bank = bank;
+        this.accountType = accountType;
     }
 }
