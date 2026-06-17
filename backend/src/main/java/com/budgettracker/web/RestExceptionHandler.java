@@ -1,6 +1,7 @@
 package com.budgettracker.web;
 
 import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.transaction.TransactionNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,11 @@ public class RestExceptionHandler {
 
     @ExceptionHandler(AccountNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(AccountNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(TransactionNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
     }
 

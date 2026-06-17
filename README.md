@@ -72,6 +72,37 @@ Create/update request body:
 }
 ```
 
+Transaction endpoints:
+
+```http
+GET /api/transactions
+GET /api/transactions/{id}
+PUT /api/transactions/{id}
+DELETE /api/transactions/{id}
+```
+
+Transaction list filters:
+
+```text
+dateFrom, dateTo, accountId, categoryId, tagId, direction, search, page, size, sort
+```
+
+Transaction update request body:
+
+```json
+{
+  "accountId": 1,
+  "transactionDate": "2026-01-10",
+  "description": "Coffee",
+  "rawDescription": "COFFEE SHOP",
+  "amount": 4.5,
+  "direction": "EXPENSE",
+  "categoryId": 2,
+  "tagId": 1,
+  "importBatchId": null
+}
+```
+
 ## Run Locally
 
 Requirements:
