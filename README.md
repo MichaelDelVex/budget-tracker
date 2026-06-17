@@ -38,7 +38,7 @@ The database foundation currently includes:
 - Categorisation rules
 - Import batches
 
-Default income and expense categories are seeded by migration so a fresh local database starts with useful category options.
+Default income and expense categories are seeded by migration so a fresh local database starts with useful category options. Property reporting tags are also seeded for rental income and common property expense buckets.
 
 The first API slice is a health endpoint:
 
@@ -140,6 +140,7 @@ Report endpoints:
 GET /api/reports/summary
 GET /api/reports/spending-by-category
 GET /api/reports/income-vs-expenses
+GET /api/reports/property
 ```
 
 Report query parameters:
@@ -149,6 +150,8 @@ dateFrom, dateTo, accountId, groupBy
 ```
 
 `groupBy` supports `FORTNIGHT`, `MONTH`, `QUARTER`, and `YEAR`. Dashboard summary cards and charts use these report endpoints.
+
+The property report uses transaction tags to total rental income, mortgage, insurance, rates, repairs, property management fees, and other property expenses.
 
 CSV import endpoint:
 
@@ -193,7 +196,7 @@ npm run dev
 
 The app runs at `http://localhost:5173`.
 
-Frontend routes are hash-based: `#/dashboard`, `#/transactions`, `#/import`, `#/categories-tags`, and `#/rules`.
+Frontend routes are hash-based: `#/dashboard`, `#/transactions`, `#/import`, `#/categories-tags`, `#/rules`, and `#/property-report`.
 
 ## Test and Build
 
@@ -222,7 +225,7 @@ npm run build
 
 Import `postman/budget-tracker.postman_collection.json` into Postman. The collection includes a `baseUrl` variable set to `http://localhost:8080`.
 
-The collection includes health, account, transaction, and CSV import requests.
+The collection includes health, account, transaction, report, category, tag, rule, and CSV import requests.
 
 ## CI
 

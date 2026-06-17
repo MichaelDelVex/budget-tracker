@@ -7,6 +7,7 @@ import type {
   ImportSummary,
   IncomeVsExpensesReportItem,
   PagedResponse,
+  PropertyReport,
   ReportFilters,
   Tag,
   SpendingByCategoryReportItem,
@@ -138,6 +139,10 @@ export function getSpendingByCategoryReport(filters: ReportFilters = {}) {
 
 export function getIncomeVsExpensesReport(filters: ReportFilters = {}) {
   return request<IncomeVsExpensesReportItem[]>(`/api/reports/income-vs-expenses?${reportParams(filters)}`);
+}
+
+export function getPropertyReport(filters: ReportFilters = {}) {
+  return request<PropertyReport>(`/api/reports/property?${reportParams(filters)}`);
 }
 
 function reportParams(filters: ReportFilters) {

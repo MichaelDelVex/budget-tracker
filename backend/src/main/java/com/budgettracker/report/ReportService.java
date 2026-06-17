@@ -6,6 +6,8 @@ import static com.budgettracker.domain.transaction.TransactionSpecifications.tra
 
 import com.budgettracker.domain.category.Category;
 import com.budgettracker.domain.category.CategoryRepository;
+import com.budgettracker.domain.tag.Tag;
+import com.budgettracker.domain.tag.TagRepository;
 import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
@@ -32,10 +34,16 @@ public class ReportService {
 
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
+    private final TagRepository tagRepository;
 
-    public ReportService(TransactionRepository transactionRepository, CategoryRepository categoryRepository) {
+    public ReportService(
+        TransactionRepository transactionRepository,
+        CategoryRepository categoryRepository,
+        TagRepository tagRepository
+    ) {
         this.transactionRepository = transactionRepository;
         this.categoryRepository = categoryRepository;
+        this.tagRepository = tagRepository;
     }
 
     @Transactional(readOnly = true)
@@ -99,6 +107,56 @@ public class ReportService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PropertyReportResponse property(ReportFilterRequest filter) {
+        List<Transaction> transactions = findTransactions(filter);
+        Map<Integer, Tag> tags = tagRepository.findAllById(
+            transactions.stream()
+                .map(Transaction::getTagId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList()
+        ).stream().collect(Collectors.toMap(Tag::getId, Function.identity()));
+
+        BigDecimal rentalIncome = propertyTotal(transactions, tags, "rental income", TransactionDirection.INCOME);
+        BigDecimal mortgage = propertyTotal(transactions, tags, "mortgage", TransactionDirection.EXPENSE);
+        BigDecimal insurance = propertyTotal(transactions, tags, "insurance", TransactionDirection.EXPENSE);
+        BigDecimal rates = propertyTotal(transactions, tags, "rates", TransactionDirection.EXPENSE);
+        BigDecimal repairs = propertyTotal(transactions, tags, "repairs", TransactionDirection.EXPENSE);
+        BigDecimal propertyManagementFees = propertyTotal(
+            transactions,
+            tags,
+            "property management",
+            TransactionDirection.EXPENSE
+        );
+        BigDecimal otherPropertyExpenses = propertyTotal(
+            transactions,
+            tags,
+            "other property expense",
+            TransactionDirection.EXPENSE
+        );
+        BigDecimal totalPropertyIncome = rentalIncome;
+        BigDecimal totalPropertyExpenses = mortgage
+            .add(insurance)
+            .add(rates)
+            .add(repairs)
+            .add(propertyManagementFees)
+            .add(otherPropertyExpenses);
+
+        return new PropertyReportResponse(
+            money(rentalIncome),
+            money(mortgage),
+            money(insurance),
+            money(rates),
+            money(repairs),
+            money(propertyManagementFees),
+            money(otherPropertyExpenses),
+            money(totalPropertyIncome),
+            money(totalPropertyExpenses),
+            money(totalPropertyIncome.subtract(totalPropertyExpenses))
+        );
+    }
+
     private List<Transaction> findTransactions(ReportFilterRequest filter) {
         Specification<Transaction> specification = Specification
             .where(transactionDateOnOrAfter(filter.dateFrom()))
@@ -145,6 +203,27 @@ public class ReportService {
             .filter(transaction -> transaction.getDirection() == direction)
             .map(Transaction::getAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal propertyTotal(
+        List<Transaction> transactions,
+        Map<Integer, Tag> tags,
+        String tagName,
+        TransactionDirection direction
+    ) {
+        return transactions.stream()
+            .filter(transaction -> transaction.getDirection() == direction)
+            .filter(transaction -> hasTagName(transaction, tags, tagName))
+            .map(Transaction::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private boolean hasTagName(Transaction transaction, Map<Integer, Tag> tags, String tagName) {
+        return Optional.ofNullable(tags.get(transaction.getTagId()))
+            .map(Tag::getName)
+            .map(name -> name.trim().toLowerCase())
+            .filter(tagName::equals)
+            .isPresent();
     }
 
     private String period(LocalDate date, ReportGroupBy groupBy) {

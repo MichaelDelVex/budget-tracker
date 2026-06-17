@@ -3,10 +3,18 @@ import { AppLayout, type RouteKey } from './components/AppLayout';
 import { CategoriesTagsPage } from './pages/CategoriesTagsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
+import { PropertyReportPage } from './pages/PropertyReportPage';
 import { RulesPage } from './pages/RulesPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 
-const routes = new Set<RouteKey>(['dashboard', 'transactions', 'import', 'categories-tags', 'rules']);
+const routes = new Set<RouteKey>([
+  'dashboard',
+  'transactions',
+  'import',
+  'categories-tags',
+  'rules',
+  'property-report',
+]);
 
 function App() {
   const [route, setRoute] = useState<RouteKey>(readRoute());
@@ -31,6 +39,7 @@ function App() {
       {route === 'import' ? <ImportPage /> : null}
       {route === 'categories-tags' ? <CategoriesTagsPage /> : null}
       {route === 'rules' ? <RulesPage /> : null}
+      {route === 'property-report' ? <PropertyReportPage /> : null}
     </AppLayout>
   );
 }

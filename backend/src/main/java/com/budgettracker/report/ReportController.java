@@ -30,4 +30,9 @@ public class ReportController {
     public List<IncomeVsExpensesResponse> incomeVsExpenses(@ModelAttribute ReportFilterRequest filter) {
         return reportService.incomeVsExpenses(filter);
     }
+
+    @GetMapping("/property")
+    public PropertyReportResponse property(@ModelAttribute ReportFilterRequest filter) {
+        return reportService.property(filter);
+    }
 }

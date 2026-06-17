@@ -58,6 +58,18 @@ const spendingByCategoryReport = [
 const incomeVsExpensesReport = [
   { period: '2026-06', totalIncome: 1000, totalExpenses: 250, netSavings: 750 },
 ];
+const propertyReport = {
+  rentalIncome: 2000,
+  mortgage: 1200,
+  insurance: 100,
+  rates: 250,
+  repairs: 300,
+  propertyManagementFees: 150,
+  otherPropertyExpenses: 75,
+  totalPropertyIncome: 2000,
+  totalPropertyExpenses: 2075,
+  netPropertyPosition: -75,
+};
 
 describe('App', () => {
   beforeEach(() => {
@@ -165,6 +177,28 @@ describe('App', () => {
     expect(screen.getByLabelText(/match text/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^category$/i)).toBeInTheDocument();
   });
+
+  it('renders property report data', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /property report/i }));
+
+    expect(await screen.findByRole('heading', { name: /property report/i })).toBeInTheDocument();
+    expect(screen.getByText('Rental Income')).toBeInTheDocument();
+    expect(screen.getByText('Mortgage')).toBeInTheDocument();
+    expect(screen.getByText('-$75.00')).toBeInTheDocument();
+  });
+
+  it('displays empty property report state', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn(mockEmptyReportFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /property report/i }));
+
+    expect(await screen.findByText(/no property report data/i)).toBeInTheDocument();
+  });
 });
 
 async function mockFetch(input: RequestInfo | URL) {
@@ -190,6 +224,9 @@ async function mockFetch(input: RequestInfo | URL) {
   if (url.startsWith('/api/reports/income-vs-expenses')) {
     return json(incomeVsExpensesReport);
   }
+  if (url.startsWith('/api/reports/property')) {
+    return json(propertyReport);
+  }
   if (url.startsWith('/api/transactions')) {
     return json(transactions);
   }
@@ -203,6 +240,20 @@ async function mockEmptyReportFetch(input: RequestInfo | URL) {
   const url = input.toString();
   if (url.startsWith('/api/reports/summary')) {
     return json({ totalIncome: 0, totalExpenses: 0, netSavings: 0, savingsPercentage: 0, transactionCount: 0 });
+  }
+  if (url.startsWith('/api/reports/property')) {
+    return json({
+      rentalIncome: 0,
+      mortgage: 0,
+      insurance: 0,
+      rates: 0,
+      repairs: 0,
+      propertyManagementFees: 0,
+      otherPropertyExpenses: 0,
+      totalPropertyIncome: 0,
+      totalPropertyExpenses: 0,
+      netPropertyPosition: 0,
+    });
   }
   if (url.startsWith('/api/reports/spending-by-category') || url.startsWith('/api/reports/income-vs-expenses')) {
     return json([]);

@@ -374,6 +374,40 @@ th {
   padding: 0.6rem 0.75rem;
 }
 
+.report-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.report-line {
+  align-items: center;
+  border-bottom: 1px solid #d8e0e7;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.7rem;
+}
+
+.report-line:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.report-line dt {
+  color: #51606f;
+}
+
+.report-line dd {
+  color: #15212d;
+  margin: 0;
+}
+
+.report-line.strong dt,
+.report-line.strong dd {
+  font-weight: 800;
+}
+
 .error-list {
   color: #8a1f1f;
   margin-bottom: 0;

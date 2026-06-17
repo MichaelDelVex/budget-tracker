@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import com.budgettracker.domain.category.Category;
 import com.budgettracker.domain.category.CategoryRepository;
 import com.budgettracker.domain.category.CategoryType;
+import com.budgettracker.domain.tag.Tag;
+import com.budgettracker.domain.tag.TagRepository;
 import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
@@ -29,6 +31,9 @@ class ReportServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private TagRepository tagRepository;
 
     @InjectMocks
     private ReportService reportService;
@@ -101,6 +106,61 @@ class ReportServiceTest {
             .containsExactly("2026-01 F1", "2026-01 F2");
     }
 
+    @Test
+    void calculatesPropertyIncomeExpensesAndNetPosition() {
+        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
+            transaction("Rent", "2000.00", TransactionDirection.INCOME, null, 1, LocalDate.of(2026, 1, 1), 10),
+            transaction("Mortgage", "1200.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 2), 11),
+            transaction("Insurance", "100.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 3), 12),
+            transaction("Rates", "250.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 4), 13),
+            transaction("Repairs", "300.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 5), 14),
+            transaction("Manager", "150.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 6), 15),
+            transaction("Other", "75.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 7), 16),
+            transaction("Unknown", "999.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 8), 17)
+        ));
+        when(tagRepository.findAllById(List.of(10, 11, 12, 13, 14, 15, 16, 17))).thenReturn(List.of(
+            tag(10, "Rental Income"),
+            tag(11, "Mortgage"),
+            tag(12, "Insurance"),
+            tag(13, "Rates"),
+            tag(14, "Repairs"),
+            tag(15, "Property Management"),
+            tag(16, "Other Property Expense"),
+            tag(17, "Holiday")
+        ));
+
+        PropertyReportResponse response = reportService.property(filter());
+
+        assertThat(response.rentalIncome()).isEqualByComparingTo("2000.00");
+        assertThat(response.mortgage()).isEqualByComparingTo("1200.00");
+        assertThat(response.insurance()).isEqualByComparingTo("100.00");
+        assertThat(response.rates()).isEqualByComparingTo("250.00");
+        assertThat(response.repairs()).isEqualByComparingTo("300.00");
+        assertThat(response.propertyManagementFees()).isEqualByComparingTo("150.00");
+        assertThat(response.otherPropertyExpenses()).isEqualByComparingTo("75.00");
+        assertThat(response.totalPropertyIncome()).isEqualByComparingTo("2000.00");
+        assertThat(response.totalPropertyExpenses()).isEqualByComparingTo("2075.00");
+        assertThat(response.netPropertyPosition()).isEqualByComparingTo("-75.00");
+    }
+
+    @Test
+    void ignoresPropertyTagsWithWrongDirectionAndUnknownTags() {
+        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
+            transaction("Wrong direction rent", "2000.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 1), 10),
+            transaction("Unknown", "50.00", TransactionDirection.EXPENSE, null, 1, LocalDate.of(2026, 1, 2), 99)
+        ));
+        when(tagRepository.findAllById(List.of(10, 99))).thenReturn(List.of(
+            tag(10, "Rental Income"),
+            tag(99, "Random")
+        ));
+
+        PropertyReportResponse response = reportService.property(filter());
+
+        assertThat(response.totalPropertyIncome()).isEqualByComparingTo("0.00");
+        assertThat(response.totalPropertyExpenses()).isEqualByComparingTo("0.00");
+        assertThat(response.netPropertyPosition()).isEqualByComparingTo("0.00");
+    }
+
     private ReportFilterRequest filter() {
         return new ReportFilterRequest(null, null, null, ReportGroupBy.MONTH);
     }
@@ -113,6 +173,18 @@ class ReportServiceTest {
         Integer accountId,
         LocalDate date
     ) {
+        return transaction(description, amount, direction, categoryId, accountId, date, null);
+    }
+
+    private Transaction transaction(
+        String description,
+        String amount,
+        TransactionDirection direction,
+        Integer categoryId,
+        Integer accountId,
+        LocalDate date,
+        Integer tagId
+    ) {
         return new Transaction(
             accountId,
             date,
@@ -121,7 +193,7 @@ class ReportServiceTest {
             new BigDecimal(amount),
             direction,
             categoryId,
-            null,
+            tagId,
             null
         );
     }
@@ -130,5 +202,11 @@ class ReportServiceTest {
         Category category = new Category(name, CategoryType.EXPENSE, true, id);
         ReflectionTestUtils.setField(category, "id", id);
         return category;
+    }
+
+    private Tag tag(Integer id, String name) {
+        Tag tag = new Tag(name, "#336699");
+        ReflectionTestUtils.setField(tag, "id", id);
+        return tag;
     }
 }

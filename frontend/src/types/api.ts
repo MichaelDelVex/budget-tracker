@@ -118,6 +118,19 @@ export interface IncomeVsExpensesReportItem {
   netSavings: number;
 }
 
+export interface PropertyReport {
+  rentalIncome: number;
+  mortgage: number;
+  insurance: number;
+  rates: number;
+  repairs: number;
+  propertyManagementFees: number;
+  otherPropertyExpenses: number;
+  totalPropertyIncome: number;
+  totalPropertyExpenses: number;
+  netPropertyPosition: number;
+}
+
 export interface ApiErrorResponse {
   message: string;
   fields?: Record<string, string>;

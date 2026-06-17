@@ -77,4 +77,28 @@ class ReportControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].period").value("2026-01"));
     }
+
+    @Test
+    void returnsPropertyReport() throws Exception {
+        when(reportService.property(any())).thenReturn(new PropertyReportResponse(
+            new BigDecimal("2000.00"),
+            new BigDecimal("1200.00"),
+            new BigDecimal("100.00"),
+            new BigDecimal("250.00"),
+            new BigDecimal("300.00"),
+            new BigDecimal("150.00"),
+            new BigDecimal("75.00"),
+            new BigDecimal("2000.00"),
+            new BigDecimal("2075.00"),
+            new BigDecimal("-75.00")
+        ));
+
+        mockMvc.perform(get("/api/reports/property")
+                .param("dateFrom", "2026-01-01")
+                .param("dateTo", "2026-01-31")
+                .param("accountId", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.rentalIncome").value(2000.00))
+            .andExpect(jsonPath("$.netPropertyPosition").value(-75.00));
+    }
 }

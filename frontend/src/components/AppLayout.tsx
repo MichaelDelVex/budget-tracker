@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type RouteKey = 'dashboard' | 'transactions' | 'import' | 'categories-tags' | 'rules';
+export type RouteKey = 'dashboard' | 'transactions' | 'import' | 'categories-tags' | 'rules' | 'property-report';
 
 const navItems: Array<{ route: RouteKey; label: string }> = [
   { route: 'dashboard', label: 'Dashboard' },
@@ -8,6 +8,7 @@ const navItems: Array<{ route: RouteKey; label: string }> = [
   { route: 'import', label: 'Import' },
   { route: 'categories-tags', label: 'Categories & Tags' },
   { route: 'rules', label: 'Rules' },
+  { route: 'property-report', label: 'Property Report' },
 ];
 
 interface AppLayoutProps {
