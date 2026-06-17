@@ -10,13 +10,18 @@ export class ApiError extends Error {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    headers: options.body instanceof FormData ? options.headers : {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      headers: options.body instanceof FormData ? options.headers : {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch {
+    throw new ApiError('Unable to reach the API. Check that the backend is running.');
+  }
 
   if (!response.ok) {
     let error: ApiErrorResponse = { message: `Request failed with status ${response.status}` };
@@ -25,7 +30,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     } catch {
       // Keep the status-based fallback.
     }
-    throw new ApiError(error.message, error.fields);
+    throw new ApiError(error.message, error.fields ?? {});
   }
 
   if (response.status === 204) {

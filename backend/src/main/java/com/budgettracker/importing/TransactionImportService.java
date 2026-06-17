@@ -17,12 +17,16 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class TransactionImportService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TransactionImportService.class);
 
     private final AccountRepository accountRepository;
     private final ImportBatchRepository importBatchRepository;
@@ -52,7 +56,14 @@ public class TransactionImportService {
 
         byte[] content = readContent(file);
         if (new String(content, StandardCharsets.UTF_8).isBlank()) {
-            return saveSummary(accountId, file.getOriginalFilename(), 0, 0, List.of(new ImportRowError(0, "CSV file is empty")));
+            return saveSummary(
+                accountId,
+                file.getOriginalFilename(),
+                0,
+                0,
+                0,
+                List.of(new ImportRowError(0, "CSV file is empty"))
+            );
         }
 
         CsvTransactionParser parser = selectParser(file.getOriginalFilename(), content);
@@ -82,13 +93,15 @@ public class TransactionImportService {
             .toList();
         transactionRepository.saveAll(transactions);
 
-        return new ImportSummaryResponse(
+        ImportSummaryResponse response = new ImportSummaryResponse(
             parsedFile.totalRows(),
             transactions.size(),
             candidates.duplicateCount(),
             parsedFile.errors().size(),
             parsedFile.errors()
         );
+        logImportSummary(accountId, originalFilename, response);
+        return response;
     }
 
     private Transaction toTransaction(Integer accountId, Integer importBatchId, ParsedTransactionRow row) {
@@ -134,6 +147,7 @@ public class TransactionImportService {
         String originalFilename,
         int totalRows,
         int importedCount,
+        int duplicateCount,
         List<ImportRowError> errors
     ) {
         importBatchRepository.save(new ImportBatch(
@@ -141,12 +155,20 @@ public class TransactionImportService {
             safeFilename(originalFilename),
             totalRows,
             importedCount,
-            0,
+            duplicateCount,
             errors.size(),
             Instant.now()
         ));
 
-        return new ImportSummaryResponse(totalRows, importedCount, 0, errors.size(), errors);
+        ImportSummaryResponse response = new ImportSummaryResponse(
+            totalRows,
+            importedCount,
+            duplicateCount,
+            errors.size(),
+            errors
+        );
+        logImportSummary(accountId, originalFilename, response);
+        return response;
     }
 
     private byte[] readContent(MultipartFile file) {
@@ -188,6 +210,18 @@ public class TransactionImportService {
         }
 
         return originalFilename;
+    }
+
+    private void logImportSummary(Integer accountId, String originalFilename, ImportSummaryResponse response) {
+        LOGGER.info(
+            "CSV import completed accountId={} filename={} totalRows={} importedCount={} duplicateCount={} failedCount={}",
+            accountId,
+            safeFilename(originalFilename),
+            response.totalRows(),
+            response.importedCount(),
+            response.duplicateCount(),
+            response.failedCount()
+        );
     }
 
     private record ImportCandidateSelection(List<ParsedTransactionRow> importableRows, int duplicateCount) {

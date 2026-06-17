@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { ApiError } from '../api/client';
 import { getAccounts, importTransactions } from '../api/budgetApi';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { LoadingState } from '../components/LoadingState';
@@ -11,6 +12,7 @@ export function ImportPage() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getAccounts().then(setAccounts).catch((exception: Error) => setError(exception.message));
@@ -18,17 +20,35 @@ export function ImportPage() {
 
   async function submitImport(event: FormEvent) {
     event.preventDefault();
-    if (!accountId || !file) {
+    const selectedFile = file;
+    const validationErrors: Record<string, string> = {};
+    if (!accountId) {
+      validationErrors.accountId = 'Choose the account these transactions belong to.';
+    }
+    if (!selectedFile) {
+      validationErrors.file = 'Choose a CSV file to import.';
+    } else if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+      validationErrors.file = 'Use a CSV export file.';
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
       setError('Choose an account and CSV file before importing.');
+      return;
+    }
+    if (!selectedFile) {
       return;
     }
 
     setLoading(true);
     try {
-      setSummary(await importTransactions(accountId, file));
+      setSummary(await importTransactions(accountId, selectedFile));
       setError(null);
+      setFieldErrors({});
     } catch (exception) {
       setError((exception as Error).message);
+      setFieldErrors(exception instanceof ApiError ? exception.fields : {});
+      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -48,7 +68,7 @@ export function ImportPage() {
         <button type="submit">Import transactions</button>
       </form>
       {loading ? <LoadingState label="Importing CSV" /> : null}
-      <ErrorMessage message={error} />
+      <ErrorMessage message={error} fields={fieldErrors} />
       {summary ? (
         <section className="result-panel" aria-label="Import summary">
           <h3>Import summary</h3>

@@ -5,7 +5,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, detail }: EmptyStateProps) {
   return (
-    <div className="empty-state">
+    <div className="empty-state" role="status">
       <strong>{title}</strong>
       <span>{detail}</span>
     </div>

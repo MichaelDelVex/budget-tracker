@@ -53,10 +53,11 @@ export function TransactionsPage() {
   }, [filters]);
 
   function setFilter(key: keyof TransactionFilters, value: string) {
-    setFilters((current) => ({ ...current, [key]: value }));
+    setFilters((current) => ({ ...current, [key]: value || undefined }));
   }
 
   async function editAssignment(transaction: Transaction, field: 'categoryId' | 'tagId', value: string) {
+    const previous = transaction;
     const updated = {
       ...transaction,
       [field]: value ? Number(value) : null,
@@ -66,6 +67,7 @@ export function TransactionsPage() {
       await updateTransaction(updated);
       setError(null);
     } catch (exception) {
+      setTransactions((current) => current.map((item) => item.id === transaction.id ? previous : item));
       setError((exception as Error).message);
     }
   }

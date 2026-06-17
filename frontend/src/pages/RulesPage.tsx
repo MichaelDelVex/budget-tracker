@@ -7,8 +7,10 @@ import {
   getTags,
   updateRule,
 } from '../api/budgetApi';
+import { ApiError } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorMessage } from '../components/ErrorMessage';
+import { LoadingState } from '../components/LoadingState';
 import type { CategorisationRule, Category, Tag } from '../types/api';
 
 const emptyRule = { matchText: '', categoryId: 0, tagId: null as number | null, active: true, priority: 100 };
@@ -20,24 +22,33 @@ export function RulesPage() {
   const [form, setForm] = useState(emptyRule);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     refresh();
   }, []);
 
   function refresh() {
+    setLoading(true);
     Promise.all([getRules(), getCategories(), getTags()])
       .then(([ruleResult, categoryResult, tagResult]) => {
         setRules(ruleResult);
         setCategories(categoryResult);
         setTags(tagResult);
+        setError(null);
       })
-      .catch((exception: Error) => setError(exception.message));
+      .catch((exception: Error) => setError(exception.message))
+      .finally(() => setLoading(false));
   }
 
   async function submitRule(event: FormEvent) {
     event.preventDefault();
-    if (!form.matchText || !form.categoryId) {
+    if (!form.matchText.trim() || !form.categoryId) {
+      setFieldErrors({
+        ...(!form.matchText.trim() ? { matchText: 'Enter text to match in imported descriptions.' } : {}),
+        ...(!form.categoryId ? { categoryId: 'Choose the category to apply.' } : {}),
+      });
       setError('Enter match text and choose a category.');
       return;
     }
@@ -52,8 +63,10 @@ export function RulesPage() {
       setEditingId(null);
       refresh();
       setError(null);
+      setFieldErrors({});
     } catch (exception) {
       setError((exception as Error).message);
+      setFieldErrors(exception instanceof ApiError ? exception.fields : {});
     }
   }
 
@@ -75,7 +88,8 @@ export function RulesPage() {
           <h2>Categorisation Rules</h2>
         </div>
       </header>
-      <ErrorMessage message={error} />
+      <ErrorMessage message={error} fields={fieldErrors} />
+      {loading ? <LoadingState label="Loading categorisation rules" /> : null}
       <form className="form-panel rule-form" onSubmit={submitRule}>
         <label>Match text<input value={form.matchText} onChange={(event) => setForm({ ...form, matchText: event.target.value })} /></label>
         <label>Category<select value={form.categoryId || ''} onChange={(event) => setForm({ ...form, categoryId: Number(event.target.value) })}><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
@@ -84,13 +98,13 @@ export function RulesPage() {
         <label className="inline-check"><input checked={form.active} type="checkbox" onChange={(event) => setForm({ ...form, active: event.target.checked })} /> Active</label>
         <button type="submit">{editingId ? 'Save rule' : 'Add rule'}</button>
       </form>
-      {rules.length === 0 ? <EmptyState title="No rules yet" detail="Add a rule to categorise imported transactions automatically." /> : null}
+      {!loading && rules.length === 0 ? <EmptyState title="No rules yet" detail="Add a rule to categorise imported transactions automatically." /> : null}
       <div className="item-list">
         {rules.map((rule) => (
           <article key={rule.id}>
             <span>
               <strong>{rule.matchText}</strong>
-              <small>{categoryName(categories, rule.categoryId)} · {tagName(tags, rule.tagId)} · priority {rule.priority}</small>
+              <small>{categoryName(categories, rule.categoryId)} - {tagName(tags, rule.tagId)} - priority {rule.priority}</small>
             </span>
             <div>
               <button type="button" onClick={() => toggleRule(rule)}>{rule.active ? 'Deactivate' : 'Activate'}</button>

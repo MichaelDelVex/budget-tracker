@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Budget Tracker API",
-    "description": "Local Budget Tracker API collection.",
+    "description": "Local Budget Tracker API collection. Variables: baseUrl defaults to http://localhost:8080; accountId, transactionId, categoryId, tagId, and categorisationRuleId should be updated to match records in your local SQLite database.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [

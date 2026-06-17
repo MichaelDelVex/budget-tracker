@@ -25,9 +25,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class TransactionImportServiceTest {
 
     @Mock
@@ -243,6 +245,23 @@ class TransactionImportServiceTest {
         assertThat(response.failedCount()).isEqualTo(1);
         assertThat(response.errors()).extracting(ImportRowError::message).contains("CSV file is empty");
         verifyNoInteractions(transactionRepository);
+    }
+
+    @Test
+    void logsImportSummaryWithoutTransactionDetails(CapturedOutput output) throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = row(LocalDate.of(2026, 1, 10), "Private Store", "4.50");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+
+        importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(output.getAll())
+            .contains("CSV import completed accountId=1 filename=transactions.csv totalRows=1 importedCount=1 duplicateCount=0 failedCount=0")
+            .doesNotContain("Private Store")
+            .doesNotContain("4.50");
     }
 
     private MockMultipartFile csvFile(String content) {

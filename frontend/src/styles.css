@@ -421,8 +421,25 @@ th {
   padding: 0.8rem;
 }
 
+.error-message p {
+  margin-bottom: 0;
+}
+
+.error-message ul {
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+}
+
 .status-text {
   color: #51606f;
+}
+
+.loading-state {
+  border: 1px solid #d8e0e7;
+  border-radius: 8px;
+  background: #ffffff;
+  margin: 0;
+  padding: 0.8rem;
 }
 
 .empty-state {

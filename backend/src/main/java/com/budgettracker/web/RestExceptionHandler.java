@@ -13,6 +13,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -68,9 +69,20 @@ public class RestExceptionHandler {
         return ResponseEntity.badRequest().body(ApiError.of(exception.getMessage()));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadableRequest() {
+        return ResponseEntity.badRequest().body(ApiError.of("Request body is invalid or malformed."));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleConflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ApiError.of("Cannot delete or update this resource because it is still referenced."));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleUnexpected() {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiError.of("Something went wrong. Check the server logs for details."));
     }
 }

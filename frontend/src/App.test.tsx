@@ -139,6 +139,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /import transactions/i }));
 
     expect(await screen.findByText(/choose an account and csv file/i)).toBeInTheDocument();
+    expect(screen.getByText(/accountId: choose the account/i)).toBeInTheDocument();
+    expect(screen.getByText(/file: choose a csv file/i)).toBeInTheDocument();
   });
 
   it('displays import summary', async () => {
@@ -165,6 +167,17 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: /categories and tags/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/category name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/tag name/i)).toBeInTheDocument();
+  });
+
+  it('validates category form input', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /categories & tags/i }));
+    await user.click(await screen.findByRole('button', { name: /add category/i }));
+
+    expect(await screen.findByText(/category name is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/name: enter a category name/i)).toBeInTheDocument();
   });
 
   it('renders rule form', async () => {
