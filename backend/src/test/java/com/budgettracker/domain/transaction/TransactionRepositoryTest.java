@@ -8,6 +8,7 @@ import static com.budgettracker.domain.transaction.TransactionSpecifications.tag
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrAfter;
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrBefore;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.budgettracker.domain.account.Account;
 import com.budgettracker.domain.account.AccountRepository;
@@ -99,6 +100,37 @@ class TransactionRepositoryTest {
         assertThat(transactionRepository.findAll(specification))
             .extracting(Transaction::getDescription)
             .containsExactly("Weekly supermarket");
+    }
+
+    @Test
+    void uniqueDuplicateKeyPreventsDirectDuplicateInsert() {
+        transactionRepository.saveAndFlush(sampleTransaction("Duplicate Coffee", TransactionDirection.EXPENSE));
+
+        assertThatThrownBy(() ->
+            transactionRepository.saveAndFlush(sampleTransaction("Duplicate Coffee", TransactionDirection.EXPENSE))
+        ).hasMessageContaining("UNIQUE constraint failed");
+    }
+
+    @Test
+    void uniqueDuplicateKeyAllowsSameTransactionOnDifferentAccount() {
+        Account otherAccount = accountRepository.save(
+            new Account("Other " + UUID.randomUUID(), "Example Bank", AccountType.CHECKING)
+        );
+        transactionRepository.saveAndFlush(sampleTransaction("Shared Coffee", TransactionDirection.EXPENSE));
+
+        Transaction otherAccountTransaction = new Transaction(
+            otherAccount.getId(),
+            LocalDate.of(2026, 1, 10),
+            "Shared Coffee",
+            "Raw Shared Coffee",
+            new BigDecimal("42.50"),
+            TransactionDirection.EXPENSE,
+            categoryId,
+            tagId,
+            null
+        );
+
+        assertThat(transactionRepository.saveAndFlush(otherAccountTransaction).getId()).isNotNull();
     }
 
     private Transaction sampleTransaction(String description, TransactionDirection direction) {

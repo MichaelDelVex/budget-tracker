@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,19 +35,22 @@ public class TransactionImportService {
     private final TransactionRepository transactionRepository;
     private final CategorisationRuleMatcher categorisationRuleMatcher;
     private final List<CsvTransactionParser> parsers;
+    private final JdbcTemplate jdbcTemplate;
 
     public TransactionImportService(
         AccountRepository accountRepository,
         ImportBatchRepository importBatchRepository,
         TransactionRepository transactionRepository,
         CategorisationRuleMatcher categorisationRuleMatcher,
-        List<CsvTransactionParser> parsers
+        List<CsvTransactionParser> parsers,
+        JdbcTemplate jdbcTemplate
     ) {
         this.accountRepository = accountRepository;
         this.importBatchRepository = importBatchRepository;
         this.transactionRepository = transactionRepository;
         this.categorisationRuleMatcher = categorisationRuleMatcher;
         this.parsers = parsers;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional
@@ -78,25 +83,24 @@ public class TransactionImportService {
     ) {
         ImportCandidateSelection candidates = selectImportCandidates(accountId, parsedFile.rows());
 
-        ImportBatch importBatch = importBatchRepository.save(new ImportBatch(
+        ImportBatch importBatch = importBatchRepository.saveAndFlush(new ImportBatch(
             accountId,
             safeFilename(originalFilename),
             parsedFile.totalRows(),
-            candidates.importableRows().size(),
+            0,
             candidates.duplicateCount(),
             parsedFile.errors().size(),
             Instant.now()
         ));
 
-        List<Transaction> transactions = candidates.importableRows().stream()
-            .map(row -> toTransaction(accountId, importBatch.getId(), row))
-            .toList();
-        transactionRepository.saveAll(transactions);
+        ImportInsertResult insertResult = insertTransactions(accountId, importBatch.getId(), candidates.importableRows());
+        int duplicateCount = candidates.duplicateCount() + insertResult.duplicateCount();
+        importBatch.updateCounts(insertResult.importedCount(), duplicateCount, parsedFile.errors().size());
 
         ImportSummaryResponse response = new ImportSummaryResponse(
             parsedFile.totalRows(),
-            transactions.size(),
-            candidates.duplicateCount(),
+            insertResult.importedCount(),
+            duplicateCount,
             parsedFile.errors().size(),
             parsedFile.errors()
         );
@@ -105,11 +109,12 @@ public class TransactionImportService {
     }
 
     private Transaction toTransaction(Integer accountId, Integer importBatchId, ParsedTransactionRow row) {
-        MatchedCategorisation categorisation = categorisationRuleMatcher.match(row.description());
+        String description = normaliseDescription(row.description());
+        MatchedCategorisation categorisation = categorisationRuleMatcher.match(description);
         return new Transaction(
             accountId,
             row.transactionDate(),
-            row.description(),
+            description,
             row.rawDescription(),
             row.amount(),
             row.direction(),
@@ -125,11 +130,12 @@ public class TransactionImportService {
         int duplicateCount = 0;
 
         for (ParsedTransactionRow row : rows) {
-            DuplicateKey key = DuplicateKey.from(accountId, row);
+            String description = normaliseDescription(row.description());
+            DuplicateKey key = DuplicateKey.from(accountId, row, description);
             if (seenInCurrentImport.contains(key) || transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
                 accountId,
                 row.transactionDate(),
-                row.description(),
+                description,
                 row.amount()
             )) {
                 duplicateCount++;
@@ -140,6 +146,68 @@ public class TransactionImportService {
         }
 
         return new ImportCandidateSelection(importableRows, duplicateCount);
+    }
+
+    private ImportInsertResult insertTransactions(
+        Integer accountId,
+        Integer importBatchId,
+        List<ParsedTransactionRow> rows
+    ) {
+        int importedCount = 0;
+        int duplicateCount = 0;
+
+        for (ParsedTransactionRow row : rows) {
+            try {
+                insertTransaction(toTransaction(accountId, importBatchId, row));
+                importedCount++;
+            } catch (DataIntegrityViolationException exception) {
+                if (!isDuplicateConstraintViolation(exception)) {
+                    throw exception;
+                }
+                duplicateCount++;
+            }
+        }
+
+        return new ImportInsertResult(importedCount, duplicateCount);
+    }
+
+    private void insertTransaction(Transaction transaction) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO transaction_record (
+                account_id,
+                transaction_date,
+                description,
+                raw_description,
+                amount,
+                direction,
+                category_id,
+                tag_id,
+                import_batch_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            transaction.getAccountId(),
+            transaction.getTransactionDate().toString(),
+            transaction.getDescription(),
+            transaction.getRawDescription(),
+            transaction.getAmount(),
+            transaction.getDirection().name(),
+            transaction.getCategoryId(),
+            transaction.getTagId(),
+            transaction.getImportBatchId()
+        );
+    }
+
+    private boolean isDuplicateConstraintViolation(DataIntegrityViolationException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+        if (message == null) {
+            message = exception.getMessage();
+        }
+
+        return message != null
+            && (message.contains("ux_transactions_duplicate_key")
+                || message.contains("transaction_record.account_id, transaction_record.transaction_date, transaction_record.description, transaction_record.amount"));
     }
 
     private ImportSummaryResponse saveSummary(
@@ -212,6 +280,10 @@ public class TransactionImportService {
         return originalFilename;
     }
 
+    private String normaliseDescription(String description) {
+        return description.trim().replaceAll("\\s+", " ");
+    }
+
     private void logImportSummary(Integer accountId, String originalFilename, ImportSummaryResponse response) {
         LOGGER.info(
             "CSV import completed accountId={} filename={} totalRows={} importedCount={} duplicateCount={} failedCount={}",
@@ -227,6 +299,9 @@ public class TransactionImportService {
     private record ImportCandidateSelection(List<ParsedTransactionRow> importableRows, int duplicateCount) {
     }
 
+    private record ImportInsertResult(int importedCount, int duplicateCount) {
+    }
+
     private record DuplicateKey(
         Integer accountId,
         LocalDate transactionDate,
@@ -234,11 +309,11 @@ public class TransactionImportService {
         BigDecimal amount
     ) {
 
-        static DuplicateKey from(Integer accountId, ParsedTransactionRow row) {
+        static DuplicateKey from(Integer accountId, ParsedTransactionRow row, String description) {
             return new DuplicateKey(
                 accountId,
                 row.transactionDate(),
-                row.description(),
+                description,
                 row.amount().stripTrailingZeros()
             );
         }

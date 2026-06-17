@@ -86,7 +86,7 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
             rowNumber,
             transactionDate,
             description.trim(),
-            description.trim(),
+            description,
             amount.amount(),
             amount.direction()
         );

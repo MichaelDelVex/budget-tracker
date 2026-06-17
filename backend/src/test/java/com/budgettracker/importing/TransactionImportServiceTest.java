@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.lenient;
@@ -22,12 +23,14 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class TransactionImportServiceTest {
@@ -46,6 +49,9 @@ class TransactionImportServiceTest {
 
     @Mock
     private CsvTransactionParser parser;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void importsParsedTransactionsAndReturnsSummary() throws Exception {
@@ -73,9 +79,7 @@ class TransactionImportServiceTest {
         assertThat(response.duplicateCount()).isZero();
         assertThat(response.failedCount()).isEqualTo(1);
 
-        ArgumentCaptor<Iterable<Transaction>> captor = ArgumentCaptor.forClass(Iterable.class);
-        verify(transactionRepository).saveAll(captor.capture());
-        assertThat(captor.getValue()).hasSize(1);
+        verify(jdbcTemplate).update(any(String.class), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -90,14 +94,18 @@ class TransactionImportServiceTest {
 
         importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
-        ArgumentCaptor<Iterable<Transaction>> captor = ArgumentCaptor.forClass(Iterable.class);
-        verify(transactionRepository).saveAll(captor.capture());
-        assertThat(captor.getValue())
-            .first()
-            .satisfies(transaction -> {
-                assertThat(transaction.getCategoryId()).isEqualTo(2);
-                assertThat(transaction.getTagId()).isEqualTo(3);
-            });
+        verify(jdbcTemplate).update(
+            any(String.class),
+            eq(1),
+            eq("2026-01-10"),
+            eq("Coffee"),
+            eq("Coffee"),
+            eq(new BigDecimal("4.50")),
+            eq("EXPENSE"),
+            eq(2),
+            eq(3),
+            eq(7)
+        );
     }
 
     @Test
@@ -119,7 +127,7 @@ class TransactionImportServiceTest {
 
         assertThat(response.importedCount()).isZero();
         assertThat(response.duplicateCount()).isEqualTo(1);
-        verify(transactionRepository).saveAll(List.of());
+        verify(jdbcTemplate, never()).update(any(String.class), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -202,6 +210,46 @@ class TransactionImportServiceTest {
     }
 
     @Test
+    void normalisesDescriptionForDuplicateChecksAndStorage() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = new ParsedTransactionRow(
+            2,
+            LocalDate.of(2026, 1, 10),
+            "  Coffee   Shop  ",
+            "  Coffee   Shop  ",
+            new BigDecimal("4.50"),
+            TransactionDirection.EXPENSE
+        );
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+
+        ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(response.importedCount()).isEqualTo(1);
+        verify(transactionRepository).existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+            1,
+            LocalDate.of(2026, 1, 10),
+            "Coffee Shop",
+            new BigDecimal("4.50")
+        );
+        verify(categorisationRuleMatcher).match("Coffee Shop");
+        verify(jdbcTemplate).update(
+            any(String.class),
+            eq(1),
+            eq("2026-01-10"),
+            eq("Coffee Shop"),
+            eq("  Coffee   Shop  "),
+            eq(new BigDecimal("4.50")),
+            eq("EXPENSE"),
+            eq(null),
+            eq(null),
+            eq(7)
+        );
+    }
+
+    @Test
     void reimportingSameCsvImportsZeroNewRows() throws Exception {
         TransactionImportService importService = service();
         stubImportBatchSave();
@@ -221,6 +269,26 @@ class TransactionImportServiceTest {
 
         assertThat(response.importedCount()).isZero();
         assertThat(response.duplicateCount()).isEqualTo(2);
+    }
+
+    @Test
+    void countsDuplicateConstraintConflictAsDuplicate() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = row(LocalDate.of(2026, 1, 10), "Coffee", "4.50");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+        when(jdbcTemplate.update(any(String.class), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            .thenThrow(new DuplicateKeyException(
+                "UNIQUE constraint failed: transaction_record.account_id, transaction_record.transaction_date, transaction_record.description, transaction_record.amount"
+            ));
+
+        ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(response.importedCount()).isZero();
+        assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.failedCount()).isZero();
     }
 
     @Test
@@ -279,7 +347,8 @@ class TransactionImportServiceTest {
             importBatchRepository,
             transactionRepository,
             categorisationRuleMatcher,
-            List.of(parser)
+            List.of(parser),
+            jdbcTemplate
         );
         lenient().when(categorisationRuleMatcher.match(any())).thenReturn(new MatchedCategorisation(null, null));
         return service;
@@ -297,6 +366,11 @@ class TransactionImportServiceTest {
     }
 
     private void stubImportBatchSave() {
-        when(importBatchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(importBatchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(importBatchRepository.saveAndFlush(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch importBatch = invocation.getArgument(0);
+            ReflectionTestUtils.setField(importBatch, "id", 7);
+            return importBatch;
+        });
     }
 }

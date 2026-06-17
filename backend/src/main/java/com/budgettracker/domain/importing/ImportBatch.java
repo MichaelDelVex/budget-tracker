@@ -108,4 +108,10 @@ public class ImportBatch {
     public Instant getCreatedAt() {
         return createdAt;
     }
+
+    public void updateCounts(int importedCount, int duplicateCount, int failedCount) {
+        this.importedCount = importedCount;
+        this.duplicateCount = duplicateCount;
+        this.failedCount = failedCount;
+    }
 }
