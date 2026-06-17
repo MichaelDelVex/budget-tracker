@@ -1,10 +1,11 @@
 package com.budgettracker.importing;
 
 import com.budgettracker.domain.transaction.TransactionDirection;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -15,6 +16,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,6 +31,12 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
         DateTimeFormatter.ofPattern("dd/MM/yyyy")
     );
 
+    private static final CSVFormat CSV_FORMAT = CSVFormat.DEFAULT.builder()
+        .setAllowMissingColumnNames(true)
+        .setIgnoreEmptyLines(true)
+        .setTrailingDelimiter(true)
+        .build();
+
     @Override
     public boolean supports(String originalFilename, List<String> header) {
         Map<String, Integer> columns = indexHeader(header);
@@ -37,32 +47,30 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
 
     @Override
     public ParsedTransactionFile parse(InputStream inputStream) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String headerLine = reader.readLine();
-            if (headerLine == null || headerLine.isBlank()) {
+        try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+             CSVParser parser = CSV_FORMAT.parse(reader)) {
+            List<CSVRecord> records = parser.getRecords();
+            if (records.isEmpty()) {
                 return new ParsedTransactionFile(0, List.of(), List.of(new ImportRowError(0, "CSV file is empty")));
             }
 
-            List<String> header = parseCsvLine(headerLine);
+            List<String> header = recordValues(records.getFirst());
             Map<String, Integer> columns = indexHeader(header);
             List<ParsedTransactionRow> rows = new ArrayList<>();
             List<ImportRowError> errors = new ArrayList<>();
-
-            String line;
-            int rowNumber = 1;
             int totalRows = 0;
-            while ((line = reader.readLine()) != null) {
-                rowNumber++;
-                if (line.isBlank()) {
+
+            for (int index = 1; index < records.size(); index++) {
+                CSVRecord record = records.get(index);
+                if (isBlank(record)) {
                     continue;
                 }
 
                 totalRows++;
-                List<String> values = parseCsvLine(line);
                 try {
-                    rows.add(parseRow(rowNumber, values, columns));
+                    rows.add(parseRow((int) record.getRecordNumber(), recordValues(record), columns));
                 } catch (IllegalArgumentException exception) {
-                    errors.add(new ImportRowError(rowNumber, exception.getMessage()));
+                    errors.add(new ImportRowError((int) record.getRecordNumber(), exception.getMessage()));
                 }
             }
 
@@ -71,6 +79,8 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
             }
 
             return new ParsedTransactionFile(totalRows, rows, errors);
+        } catch (IllegalArgumentException | IOException | UncheckedIOException exception) {
+            return new ParsedTransactionFile(0, List.of(), List.of(new ImportRowError(0, "Malformed CSV file")));
         }
     }
 
@@ -212,30 +222,14 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
         };
     }
 
-    private List<String> parseCsvLine(String line) {
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-
-        for (int i = 0; i < line.length(); i++) {
-            char character = line.charAt(i);
-            if (character == '"') {
-                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-                    current.append('"');
-                    i++;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-            } else if (character == ',' && !inQuotes) {
-                values.add(current.toString());
-                current.setLength(0);
-            } else {
-                current.append(character);
-            }
-        }
-
-        values.add(current.toString());
+    private List<String> recordValues(CSVRecord record) {
+        List<String> values = new ArrayList<>(record.size());
+        record.forEach(values::add);
         return values;
+    }
+
+    private boolean isBlank(CSVRecord record) {
+        return record.stream().allMatch(value -> value == null || value.isBlank());
     }
 
     private record NormalisedAmount(BigDecimal amount, TransactionDirection direction) {

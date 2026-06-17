@@ -39,6 +39,67 @@ class NabCsvTransactionParserTest {
     }
 
     @Test
+    void parsesSimpleValidNabSignedAmountCsv() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Description,Amount
+            10/01/2026,Coffee,-4.50
+            """));
+
+        assertThat(parsed.totalRows()).isEqualTo(1);
+        assertThat(parsed.errors()).isEmpty();
+        assertThat(parsed.rows().getFirst().description()).isEqualTo("Coffee");
+        assertThat(parsed.rows().getFirst().rawDescription()).isEqualTo("Coffee");
+        assertThat(parsed.rows().getFirst().direction()).isEqualTo(TransactionDirection.EXPENSE);
+    }
+
+    @Test
+    void parsesQuotedCommaInDescription() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Description,Amount
+            10/01/2026,"Coffee, City",-4.50
+            """));
+
+        assertThat(parsed.errors()).isEmpty();
+        assertThat(parsed.rows().getFirst().description()).isEqualTo("Coffee, City");
+    }
+
+    @Test
+    void parsesQuotedMultilineDescription() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Description,Amount
+            10/01/2026,"Coffee
+            City",-4.50
+            """));
+
+        assertThat(parsed.errors()).isEmpty();
+        assertThat(parsed.totalRows()).isEqualTo(1);
+        assertThat(parsed.rows().getFirst().description()).isEqualTo("Coffee\nCity");
+    }
+
+    @Test
+    void preservesEmptyTrailingColumns() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Description,Debit,Credit
+            10/01/2026,Coffee,4.50,
+            11/01/2026,Salary,,1000.00
+            """));
+
+        assertThat(parsed.errors()).isEmpty();
+        assertThat(parsed.rows()).hasSize(2);
+        assertThat(parsed.rows().get(0).direction()).isEqualTo(TransactionDirection.EXPENSE);
+        assertThat(parsed.rows().get(1).direction()).isEqualTo(TransactionDirection.INCOME);
+    }
+
+    @Test
+    void parsesUtf8BomAtStartOfFile() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("\uFEFFDate,Description,Amount\n10/01/2026,Coffee,-4.50\n"));
+
+        assertThat(parsed.errors()).isEmpty();
+        assertThat(parsed.rows()).hasSize(1);
+        assertThat(parsed.rows().getFirst().description()).isEqualTo("Coffee");
+    }
+
+    @Test
     void normalisesSignedAmountRows() throws Exception {
         ParsedTransactionFile parsed = parser.parse(csv("""
             Date,Description,Amount
@@ -50,6 +111,18 @@ class NabCsvTransactionParserTest {
         assertThat(parsed.rows().get(0).direction()).isEqualTo(TransactionDirection.EXPENSE);
         assertThat(parsed.rows().get(1).amount()).isEqualByComparingTo(new BigDecimal("12.00"));
         assertThat(parsed.rows().get(1).direction()).isEqualTo(TransactionDirection.INCOME);
+    }
+
+    @Test
+    void reportsMalformedQuoteSyntaxCleanly() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Description,Amount
+            10/01/2026,"Coffee,-4.50
+            """));
+
+        assertThat(parsed.totalRows()).isZero();
+        assertThat(parsed.rows()).isEmpty();
+        assertThat(parsed.errors()).extracting(ImportRowError::message).contains("Malformed CSV file");
     }
 
     @Test
