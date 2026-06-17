@@ -134,6 +134,22 @@ DELETE /api/categorisation-rules/{id}
 
 Rules match imported transaction descriptions case-insensitively. Active rules are applied by priority, with lower numbers winning. If no rule matches, imports use the active `Uncategorised` category when it exists.
 
+Report endpoints:
+
+```http
+GET /api/reports/summary
+GET /api/reports/spending-by-category
+GET /api/reports/income-vs-expenses
+```
+
+Report query parameters:
+
+```text
+dateFrom, dateTo, accountId, groupBy
+```
+
+`groupBy` supports `FORTNIGHT`, `MONTH`, `QUARTER`, and `YEAR`. Dashboard summary cards and charts use these report endpoints.
+
 CSV import endpoint:
 
 ```http

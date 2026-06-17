@@ -1,26 +1,44 @@
-import { useEffect, useMemo, useState } from 'react';
-import { getTransactions } from '../api/budgetApi';
+import { useEffect, useState } from 'react';
+import { getIncomeVsExpensesReport, getSpendingByCategoryReport, getSummaryReport } from '../api/budgetApi';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorMessage } from '../components/ErrorMessage';
+import { IncomeVsExpensesChart } from '../components/IncomeVsExpensesChart';
 import { LoadingState } from '../components/LoadingState';
+import { SpendingByCategoryChart } from '../components/SpendingByCategoryChart';
 import { SummaryCard } from '../components/SummaryCard';
-import type { Transaction } from '../types/api';
+import type { IncomeVsExpensesReportItem, SpendingByCategoryReportItem, SummaryReport } from '../types/api';
 
 const currency = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
+const emptySummary: SummaryReport = {
+  totalIncome: 0,
+  totalExpenses: 0,
+  netSavings: 0,
+  savingsPercentage: 0,
+  transactionCount: 0,
+};
 
 export function DashboardPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [summary, setSummary] = useState<SummaryReport>(emptySummary);
+  const [spendingByCategory, setSpendingByCategory] = useState<SpendingByCategoryReportItem[]>([]);
+  const [incomeVsExpenses, setIncomeVsExpenses] = useState<IncomeVsExpensesReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getTransactions({}).then((response) => {
-      if (active) {
-        setTransactions(response.content);
-        setError(null);
+    Promise.all([
+      getSummaryReport(),
+      getSpendingByCategoryReport(),
+      getIncomeVsExpensesReport({ groupBy: 'MONTH' }),
+    ]).then(([summaryResult, spendingResult, incomeVsExpensesResult]) => {
+      if (!active) {
+        return;
       }
+      setSummary(summaryResult);
+      setSpendingByCategory(spendingResult);
+      setIncomeVsExpenses(incomeVsExpensesResult);
+      setError(null);
     }).catch((exception: Error) => {
       if (active) {
         setError(exception.message);
@@ -36,25 +54,6 @@ export function DashboardPage() {
     };
   }, []);
 
-  const summary = useMemo(() => {
-    const income = total(transactions, 'INCOME');
-    const expenses = total(transactions, 'EXPENSE');
-    const savings = income - expenses;
-    const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
-    const fortnightTransactions = transactions.filter((transaction) =>
-      daysBetween(new Date(transaction.transactionDate), new Date()) <= 14
-    );
-
-    return {
-      income,
-      expenses,
-      savings,
-      savingsRate,
-      fortnightIncome: total(fortnightTransactions, 'INCOME'),
-      fortnightExpenses: total(fortnightTransactions, 'EXPENSE'),
-    };
-  }, [transactions]);
-
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -66,29 +65,23 @@ export function DashboardPage() {
       {loading ? <LoadingState label="Loading dashboard" /> : null}
       <ErrorMessage message={error} />
       <div className="summary-grid" aria-label="Budget summary cards">
-        <SummaryCard label="Income" value={currency.format(summary.income)} />
-        <SummaryCard label="Expenses" value={currency.format(summary.expenses)} />
-        <SummaryCard label="Savings" value={currency.format(summary.savings)} />
-        <SummaryCard label="Savings percentage" value={`${summary.savingsRate}%`} />
+        <SummaryCard label="Income" value={currency.format(Number(summary.totalIncome))} />
+        <SummaryCard label="Expenses" value={currency.format(Number(summary.totalExpenses))} />
+        <SummaryCard label="Savings" value={currency.format(Number(summary.netSavings))} />
+        <SummaryCard label="Savings percentage" value={`${Number(summary.savingsPercentage).toFixed(2)}%`} />
         <SummaryCard
-          label="Current fortnight"
-          value={currency.format(summary.fortnightIncome - summary.fortnightExpenses)}
-          detail={`${currency.format(summary.fortnightIncome)} in, ${currency.format(summary.fortnightExpenses)} out`}
+          label="Transaction count"
+          value={String(summary.transactionCount)}
+          detail="Filtered by selected report range"
         />
       </div>
-      {!loading && transactions.length === 0 ? (
+      {!loading && summary.transactionCount === 0 ? (
         <EmptyState title="No transactions yet" detail="Import a CSV to start seeing budget totals." />
       ) : null}
+      <div className="two-column">
+        <SpendingByCategoryChart items={spendingByCategory} />
+        <IncomeVsExpensesChart items={incomeVsExpenses} />
+      </div>
     </section>
   );
-}
-
-function total(transactions: Transaction[], direction: 'INCOME' | 'EXPENSE') {
-  return transactions
-    .filter((transaction) => transaction.direction === direction)
-    .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
-}
-
-function daysBetween(date: Date, now: Date) {
-  return Math.abs(now.getTime() - date.getTime()) / 86_400_000;
 }

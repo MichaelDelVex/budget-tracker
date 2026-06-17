@@ -5,8 +5,12 @@ import type {
   Category,
   CategoryType,
   ImportSummary,
+  IncomeVsExpensesReportItem,
   PagedResponse,
+  ReportFilters,
   Tag,
+  SpendingByCategoryReportItem,
+  SummaryReport,
   Transaction,
   TransactionFilters,
 } from '../types/api';
@@ -122,4 +126,26 @@ export function importTransactions(accountId: string, file: File) {
   data.append('accountId', accountId);
   data.append('file', file);
   return request<ImportSummary>('/api/imports/transactions', { method: 'POST', body: data });
+}
+
+export function getSummaryReport(filters: ReportFilters = {}) {
+  return request<SummaryReport>(`/api/reports/summary?${reportParams(filters)}`);
+}
+
+export function getSpendingByCategoryReport(filters: ReportFilters = {}) {
+  return request<SpendingByCategoryReportItem[]>(`/api/reports/spending-by-category?${reportParams(filters)}`);
+}
+
+export function getIncomeVsExpensesReport(filters: ReportFilters = {}) {
+  return request<IncomeVsExpensesReportItem[]>(`/api/reports/income-vs-expenses?${reportParams(filters)}`);
+}
+
+function reportParams(filters: ReportFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) {
+      params.set(key, value);
+    }
+  });
+  return params.toString();
 }

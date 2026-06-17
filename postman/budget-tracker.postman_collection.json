@@ -441,6 +441,96 @@
       ]
     },
     {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Summary Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/summary?dateFrom=2026-01-01&dateTo=2026-01-31&accountId={{accountId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "summary"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-01-31"
+                },
+                {
+                  "key": "accountId",
+                  "value": "{{accountId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Spending By Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/spending-by-category?dateFrom=2026-01-01&dateTo=2026-01-31&accountId={{accountId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "spending-by-category"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-01-31"
+                },
+                {
+                  "key": "accountId",
+                  "value": "{{accountId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Income Vs Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/income-vs-expenses?dateFrom=2026-01-01&dateTo=2026-12-31&accountId={{accountId}}&groupBy=MONTH",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "income-vs-expenses"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "accountId",
+                  "value": "{{accountId}}"
+                },
+                {
+                  "key": "groupBy",
+                  "value": "MONTH"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Imports",
       "item": [
         {

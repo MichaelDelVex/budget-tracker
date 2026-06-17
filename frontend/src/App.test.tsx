@@ -45,6 +45,19 @@ const transactions = {
   page: 0,
   size: 50,
 };
+const summaryReport = {
+  totalIncome: 1000,
+  totalExpenses: 250,
+  netSavings: 750,
+  savingsPercentage: 75,
+  transactionCount: 2,
+};
+const spendingByCategoryReport = [
+  { categoryId: 2, categoryName: 'Dining', totalAmount: 120, percentageOfExpenses: 48 },
+];
+const incomeVsExpensesReport = [
+  { period: '2026-06', totalIncome: 1000, totalExpenses: 250, netSavings: 750 },
+];
 
 describe('App', () => {
   beforeEach(() => {
@@ -71,7 +84,24 @@ describe('App', () => {
     expect(screen.getByText('Expenses')).toBeInTheDocument();
     expect(screen.getByText('Savings')).toBeInTheDocument();
     expect(screen.getByText('Savings percentage')).toBeInTheDocument();
-    expect(screen.getByText('Current fortnight')).toBeInTheDocument();
+    expect(screen.getByText('Transaction count')).toBeInTheDocument();
+  });
+
+  it('renders dashboard charts', async () => {
+    render(<App />);
+
+    expect(await screen.findByLabelText(/spending by category chart/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/income vs expenses chart/i)).toBeInTheDocument();
+  });
+
+  it('displays empty report state', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockEmptyReportFetch));
+
+    render(<App />);
+
+    expect(await screen.findByText(/no transactions yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no spending data/i)).toBeInTheDocument();
+    expect(screen.getByText(/no income or expenses/i)).toBeInTheDocument();
   });
 
   it('updates transaction request state from filters', async () => {
@@ -151,6 +181,15 @@ async function mockFetch(input: RequestInfo | URL) {
   if (url.startsWith('/api/categorisation-rules')) {
     return json(rules);
   }
+  if (url.startsWith('/api/reports/summary')) {
+    return json(summaryReport);
+  }
+  if (url.startsWith('/api/reports/spending-by-category')) {
+    return json(spendingByCategoryReport);
+  }
+  if (url.startsWith('/api/reports/income-vs-expenses')) {
+    return json(incomeVsExpensesReport);
+  }
   if (url.startsWith('/api/transactions')) {
     return json(transactions);
   }
@@ -158,6 +197,17 @@ async function mockFetch(input: RequestInfo | URL) {
     return json({ totalRows: 2, importedCount: 1, duplicateCount: 1, failedCount: 0, errors: [] });
   }
   return json({});
+}
+
+async function mockEmptyReportFetch(input: RequestInfo | URL) {
+  const url = input.toString();
+  if (url.startsWith('/api/reports/summary')) {
+    return json({ totalIncome: 0, totalExpenses: 0, netSavings: 0, savingsPercentage: 0, transactionCount: 0 });
+  }
+  if (url.startsWith('/api/reports/spending-by-category') || url.startsWith('/api/reports/income-vs-expenses')) {
+    return json([]);
+  }
+  return mockFetch(input);
 }
 
 function json(body: unknown) {

@@ -87,6 +87,37 @@ export interface ImportSummary {
   errors: ImportRowError[];
 }
 
+export type ReportGroupBy = 'FORTNIGHT' | 'MONTH' | 'QUARTER' | 'YEAR';
+
+export interface ReportFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  accountId?: string;
+  groupBy?: ReportGroupBy;
+}
+
+export interface SummaryReport {
+  totalIncome: number;
+  totalExpenses: number;
+  netSavings: number;
+  savingsPercentage: number;
+  transactionCount: number;
+}
+
+export interface SpendingByCategoryReportItem {
+  categoryId: number | null;
+  categoryName: string;
+  totalAmount: number;
+  percentageOfExpenses: number;
+}
+
+export interface IncomeVsExpensesReportItem {
+  period: string;
+  totalIncome: number;
+  totalExpenses: number;
+  netSavings: number;
+}
+
 export interface ApiErrorResponse {
   message: string;
   fields?: Record<string, string>;

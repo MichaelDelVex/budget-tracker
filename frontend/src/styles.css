@@ -141,6 +141,7 @@ p {
 
 .summary-card,
 .work-panel,
+.chart-panel,
 .form-panel,
 .result-panel,
 .empty-state {
@@ -232,8 +233,86 @@ th {
 }
 
 .work-panel h3,
+.chart-panel h3,
 .result-panel h3 {
   margin-bottom: 0;
+}
+
+.chart-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.bar-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.bar-row {
+  align-items: center;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(90px, 1fr) minmax(120px, 3fr) minmax(80px, auto);
+}
+
+.bar-track {
+  border-radius: 999px;
+  background: #e5ebf0;
+  height: 0.75rem;
+  overflow: hidden;
+}
+
+.bar-track i {
+  background: #46685b;
+  display: block;
+  height: 100%;
+}
+
+.period-chart {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  min-height: 14rem;
+}
+
+.period-column {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.period-bars {
+  align-items: end;
+  display: flex;
+  gap: 0.25rem;
+  height: 10rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.period-bars i {
+  border-radius: 4px 4px 0 0;
+  display: block;
+  min-height: 2px;
+  width: 1rem;
+}
+
+.income-bar {
+  background: #2f855a;
+}
+
+.expense-bar {
+  background: #b45309;
+}
+
+.period-column span {
+  color: #667789;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .item-list {
