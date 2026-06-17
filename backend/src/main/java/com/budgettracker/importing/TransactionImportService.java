@@ -8,10 +8,15 @@ import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -57,17 +62,19 @@ public class TransactionImportService {
         String originalFilename,
         ParsedTransactionFile parsedFile
     ) {
+        ImportCandidateSelection candidates = selectImportCandidates(accountId, parsedFile.rows());
+
         ImportBatch importBatch = importBatchRepository.save(new ImportBatch(
             accountId,
             safeFilename(originalFilename),
             parsedFile.totalRows(),
-            parsedFile.rows().size(),
-            0,
+            candidates.importableRows().size(),
+            candidates.duplicateCount(),
             parsedFile.errors().size(),
             Instant.now()
         ));
 
-        List<Transaction> transactions = parsedFile.rows().stream()
+        List<Transaction> transactions = candidates.importableRows().stream()
             .map(row -> new Transaction(
                 accountId,
                 row.transactionDate(),
@@ -85,10 +92,33 @@ public class TransactionImportService {
         return new ImportSummaryResponse(
             parsedFile.totalRows(),
             transactions.size(),
-            0,
+            candidates.duplicateCount(),
             parsedFile.errors().size(),
             parsedFile.errors()
         );
+    }
+
+    private ImportCandidateSelection selectImportCandidates(Integer accountId, List<ParsedTransactionRow> rows) {
+        List<ParsedTransactionRow> importableRows = new ArrayList<>();
+        Set<DuplicateKey> seenInCurrentImport = new HashSet<>();
+        int duplicateCount = 0;
+
+        for (ParsedTransactionRow row : rows) {
+            DuplicateKey key = DuplicateKey.from(accountId, row);
+            if (seenInCurrentImport.contains(key) || transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+                accountId,
+                row.transactionDate(),
+                row.description(),
+                row.amount()
+            )) {
+                duplicateCount++;
+            } else {
+                seenInCurrentImport.add(key);
+                importableRows.add(row);
+            }
+        }
+
+        return new ImportCandidateSelection(importableRows, duplicateCount);
     }
 
     private ImportSummaryResponse saveSummary(
@@ -150,5 +180,25 @@ public class TransactionImportService {
         }
 
         return originalFilename;
+    }
+
+    private record ImportCandidateSelection(List<ParsedTransactionRow> importableRows, int duplicateCount) {
+    }
+
+    private record DuplicateKey(
+        Integer accountId,
+        LocalDate transactionDate,
+        String description,
+        BigDecimal amount
+    ) {
+
+        static DuplicateKey from(Integer accountId, ParsedTransactionRow row) {
+            return new DuplicateKey(
+                accountId,
+                row.transactionDate(),
+                row.description(),
+                row.amount().stripTrailingZeros()
+            );
+        }
     }
 }

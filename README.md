@@ -116,7 +116,7 @@ accountId
 file
 ```
 
-The initial parser supports NAB-style CSV exports. Duplicate detection is intentionally deferred.
+The initial parser supports NAB-style CSV exports. Imports skip duplicate transactions using the account, transaction date, description, and amount as the duplicate key.
 
 ## Run Locally
 
@@ -173,7 +173,7 @@ npm run build
 
 Import `postman/budget-tracker.postman_collection.json` into Postman. The collection includes a `baseUrl` variable set to `http://localhost:8080`.
 
-The collection includes health and account CRUD requests.
+The collection includes health, account, transaction, and CSV import requests.
 
 ## CI
 
