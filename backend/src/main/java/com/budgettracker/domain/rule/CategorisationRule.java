@@ -1,6 +1,7 @@
 package com.budgettracker.domain.rule;
 
 import com.budgettracker.domain.category.Category;
+import com.budgettracker.domain.tag.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,6 +17,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "categorisation_rule")
@@ -24,11 +26,6 @@ public class CategorisationRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-
-    @NotBlank
-    @Size(max = 120)
-    @Column(nullable = false, unique = true)
-    private String name;
 
     @NotBlank
     @Size(max = 255)
@@ -40,33 +37,38 @@ public class CategorisationRule {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tag_id")
+    private Tag tag;
+
     @Min(0)
     @Column(nullable = false)
     private int priority;
 
     @Column(nullable = false)
-    private boolean enabled = true;
+    private boolean active = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
     protected CategorisationRule() {
     }
 
-    public CategorisationRule(String name, String matchText, Category category, int priority) {
-        this.name = name;
+    public CategorisationRule(String matchText, Category category, Tag tag, boolean active, int priority) {
         this.matchText = matchText;
         this.category = category;
+        this.tag = tag;
+        this.active = active;
         this.priority = priority;
     }
 
     public Integer getId() {
         return id;
-    }
-
-    public String getName() {
-        return name;
     }
 
     public String getMatchText() {
@@ -77,15 +79,31 @@ public class CategorisationRule {
         return category;
     }
 
+    public Tag getTag() {
+        return tag;
+    }
+
     public int getPriority() {
         return priority;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    public boolean isActive() {
+        return active;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void update(String matchText, Category category, Tag tag, boolean active, int priority) {
+        this.matchText = matchText;
+        this.category = category;
+        this.tag = tag;
+        this.active = active;
+        this.priority = priority;
     }
 }

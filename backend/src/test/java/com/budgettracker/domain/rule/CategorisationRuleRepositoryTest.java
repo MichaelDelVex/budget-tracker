@@ -23,13 +23,13 @@ class CategorisationRuleRepositoryTest {
     private CategoryRepository categoryRepository;
 
     @Test
-    void savesAndFindsEnabledRulesByPriority() {
+    void savesAndFindsActiveRulesByPriority() {
         Category category = categoryRepository.findByName("Groceries").orElseThrow();
-        String name = "Supermarket " + UUID.randomUUID();
-        ruleRepository.save(new CategorisationRule(name, "supermarket", category, 10));
+        String matchText = "supermarket " + UUID.randomUUID();
+        ruleRepository.save(new CategorisationRule(matchText, category, null, true, 10));
 
-        assertThat(ruleRepository.findByEnabledTrueOrderByPriorityAsc())
-            .extracting(CategorisationRule::getName)
-            .contains(name);
+        assertThat(ruleRepository.findByActiveTrueOrderByPriorityAscIdAsc())
+            .extracting(CategorisationRule::getMatchText)
+            .contains(matchText);
     }
 }

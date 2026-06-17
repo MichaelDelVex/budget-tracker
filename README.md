@@ -103,6 +103,35 @@ Transaction update request body:
 }
 ```
 
+Category endpoints:
+
+```http
+GET /api/categories
+POST /api/categories
+PUT /api/categories/{id}
+DELETE /api/categories/{id}
+```
+
+Tag endpoints:
+
+```http
+GET /api/tags
+POST /api/tags
+PUT /api/tags/{id}
+DELETE /api/tags/{id}
+```
+
+Categorisation rule endpoints:
+
+```http
+GET /api/categorisation-rules
+POST /api/categorisation-rules
+PUT /api/categorisation-rules/{id}
+DELETE /api/categorisation-rules/{id}
+```
+
+Rules match imported transaction descriptions case-insensitively. Active rules are applied by priority, with lower numbers winning. If no rule matches, imports use the active `Uncategorised` category when it exists.
+
 CSV import endpoint:
 
 ```http

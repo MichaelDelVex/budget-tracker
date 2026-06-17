@@ -5,5 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CategorisationRuleRepository extends JpaRepository<CategorisationRule, Integer> {
 
-    List<CategorisationRule> findByEnabledTrueOrderByPriorityAsc();
+    List<CategorisationRule> findAllByOrderByPriorityAscIdAsc();
+
+    List<CategorisationRule> findByActiveTrueOrderByPriorityAscIdAsc();
 }

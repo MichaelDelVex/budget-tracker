@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.budgettracker.account.AccountNotFoundException;
@@ -39,6 +40,9 @@ class TransactionImportServiceTest {
     private TransactionRepository transactionRepository;
 
     @Mock
+    private CategorisationRuleMatcher categorisationRuleMatcher;
+
+    @Mock
     private CsvTransactionParser parser;
 
     @Test
@@ -70,6 +74,28 @@ class TransactionImportServiceTest {
         ArgumentCaptor<Iterable<Transaction>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(transactionRepository).saveAll(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
+    }
+
+    @Test
+    void appliesMatchedCategoryAndTagToImportedTransactions() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = row(LocalDate.of(2026, 1, 10), "Coffee", "4.50");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+        when(categorisationRuleMatcher.match("Coffee")).thenReturn(new MatchedCategorisation(2, 3));
+
+        importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        ArgumentCaptor<Iterable<Transaction>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(transactionRepository).saveAll(captor.capture());
+        assertThat(captor.getValue())
+            .first()
+            .satisfies(transaction -> {
+                assertThat(transaction.getCategoryId()).isEqualTo(2);
+                assertThat(transaction.getTagId()).isEqualTo(3);
+            });
     }
 
     @Test
@@ -229,12 +255,15 @@ class TransactionImportServiceTest {
     }
 
     private TransactionImportService service() {
-        return new TransactionImportService(
+        TransactionImportService service = new TransactionImportService(
             accountRepository,
             importBatchRepository,
             transactionRepository,
+            categorisationRuleMatcher,
             List.of(parser)
         );
+        lenient().when(categorisationRuleMatcher.match(any())).thenReturn(new MatchedCategorisation(null, null));
+        return service;
     }
 
     private ParsedTransactionRow row(LocalDate date, String description, String amount) {

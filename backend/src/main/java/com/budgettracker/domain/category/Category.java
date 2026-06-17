@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "category")
@@ -46,6 +47,10 @@ public class Category {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected Category() {
     }
@@ -83,5 +88,17 @@ public class Category {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void update(String name, CategoryType type, boolean defaultCategory, boolean active, int sortOrder) {
+        this.name = name;
+        this.type = type;
+        this.defaultCategory = defaultCategory;
+        this.active = active;
+        this.sortOrder = sortOrder;
     }
 }

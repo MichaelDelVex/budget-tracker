@@ -27,17 +27,20 @@ public class TransactionImportService {
     private final AccountRepository accountRepository;
     private final ImportBatchRepository importBatchRepository;
     private final TransactionRepository transactionRepository;
+    private final CategorisationRuleMatcher categorisationRuleMatcher;
     private final List<CsvTransactionParser> parsers;
 
     public TransactionImportService(
         AccountRepository accountRepository,
         ImportBatchRepository importBatchRepository,
         TransactionRepository transactionRepository,
+        CategorisationRuleMatcher categorisationRuleMatcher,
         List<CsvTransactionParser> parsers
     ) {
         this.accountRepository = accountRepository;
         this.importBatchRepository = importBatchRepository;
         this.transactionRepository = transactionRepository;
+        this.categorisationRuleMatcher = categorisationRuleMatcher;
         this.parsers = parsers;
     }
 
@@ -75,17 +78,7 @@ public class TransactionImportService {
         ));
 
         List<Transaction> transactions = candidates.importableRows().stream()
-            .map(row -> new Transaction(
-                accountId,
-                row.transactionDate(),
-                row.description(),
-                row.rawDescription(),
-                row.amount(),
-                row.direction(),
-                null,
-                null,
-                importBatch.getId()
-            ))
+            .map(row -> toTransaction(accountId, importBatch.getId(), row))
             .toList();
         transactionRepository.saveAll(transactions);
 
@@ -95,6 +88,21 @@ public class TransactionImportService {
             candidates.duplicateCount(),
             parsedFile.errors().size(),
             parsedFile.errors()
+        );
+    }
+
+    private Transaction toTransaction(Integer accountId, Integer importBatchId, ParsedTransactionRow row) {
+        MatchedCategorisation categorisation = categorisationRuleMatcher.match(row.description());
+        return new Transaction(
+            accountId,
+            row.transactionDate(),
+            row.description(),
+            row.rawDescription(),
+            row.amount(),
+            row.direction(),
+            categorisation.categoryId(),
+            categorisation.tagId(),
+            importBatchId
         );
     }
 

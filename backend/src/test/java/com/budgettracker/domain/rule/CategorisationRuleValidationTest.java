@@ -8,9 +8,9 @@ import org.junit.jupiter.api.Test;
 class CategorisationRuleValidationTest extends ValidationTestSupport {
 
     @Test
-    void requiresNameMatchTextCategoryAndNonNegativePriority() {
-        CategorisationRule rule = new CategorisationRule("", "", null, -1);
+    void requiresMatchTextCategoryAndNonNegativePriority() {
+        CategorisationRule rule = new CategorisationRule("", null, null, true, -1);
 
-        assertThat(invalidProperties(rule)).contains("name", "matchText", "category", "priority");
+        assertThat(invalidProperties(rule)).contains("matchText", "category", "priority");
     }
 }
