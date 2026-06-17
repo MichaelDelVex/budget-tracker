@@ -10,7 +10,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.category.CategoryNotFoundException;
 import com.budgettracker.domain.transaction.TransactionDirection;
+import com.budgettracker.tag.TagNotFoundException;
 import com.budgettracker.web.RestExceptionHandler;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -137,7 +140,52 @@ class TransactionControllerTest {
             .andExpect(jsonPath("$.fields.description").exists())
             .andExpect(jsonPath("$.fields.rawDescription").exists())
             .andExpect(jsonPath("$.fields.amount").exists())
-            .andExpect(jsonPath("$.fields.direction").exists());
+            .andExpect(jsonPath("$.fields.direction").exists())
+            .andExpect(jsonPath("$.fields.categoryId").exists())
+            .andExpect(jsonPath("$.fields.tagId").exists())
+            .andExpect(jsonPath("$.fields.importBatchId").exists());
+    }
+
+    @Test
+    void returnsClearErrorWhenUpdateAccountIsMissing() throws Exception {
+        when(transactionService.updateTransaction(
+            org.mockito.ArgumentMatchers.eq(1),
+            org.mockito.ArgumentMatchers.any(TransactionUpdateRequest.class)
+        )).thenThrow(new AccountNotFoundException(99));
+
+        mockMvc.perform(put("/api/transactions/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validUpdateRequestJson(99, 2, 3)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.message").value("Account not found: 99"));
+    }
+
+    @Test
+    void returnsClearErrorWhenUpdateCategoryIsMissing() throws Exception {
+        when(transactionService.updateTransaction(
+            org.mockito.ArgumentMatchers.eq(1),
+            org.mockito.ArgumentMatchers.any(TransactionUpdateRequest.class)
+        )).thenThrow(new CategoryNotFoundException(99));
+
+        mockMvc.perform(put("/api/transactions/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validUpdateRequestJson(1, 99, 3)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.message").value("Category not found: 99"));
+    }
+
+    @Test
+    void returnsClearErrorWhenUpdateTagIsMissing() throws Exception {
+        when(transactionService.updateTransaction(
+            org.mockito.ArgumentMatchers.eq(1),
+            org.mockito.ArgumentMatchers.any(TransactionUpdateRequest.class)
+        )).thenThrow(new TagNotFoundException(99));
+
+        mockMvc.perform(put("/api/transactions/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validUpdateRequestJson(1, 2, 99)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.message").value("Tag not found: 99"));
     }
 
     @Test
@@ -172,5 +220,21 @@ class TransactionControllerTest {
             now,
             now
         );
+    }
+
+    private static String validUpdateRequestJson(Integer accountId, Integer categoryId, Integer tagId) {
+        return """
+            {
+              "accountId": %d,
+              "transactionDate": "2026-01-10",
+              "description": "Coffee",
+              "rawDescription": "COFFEE SHOP",
+              "amount": 4.50,
+              "direction": "EXPENSE",
+              "categoryId": %d,
+              "tagId": %d,
+              "importBatchId": null
+            }
+            """.formatted(accountId, categoryId, tagId);
     }
 }

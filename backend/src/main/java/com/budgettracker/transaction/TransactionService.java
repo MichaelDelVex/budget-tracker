@@ -8,8 +8,16 @@ import static com.budgettracker.domain.transaction.TransactionSpecifications.tag
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrAfter;
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrBefore;
 
+import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.category.CategoryNotFoundException;
+import com.budgettracker.domain.account.AccountRepository;
+import com.budgettracker.domain.category.CategoryRepository;
+import com.budgettracker.domain.importing.ImportBatchRepository;
+import com.budgettracker.domain.tag.TagRepository;
 import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionRepository;
+import com.budgettracker.importing.ImportBatchNotFoundException;
+import com.budgettracker.tag.TagNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -20,9 +28,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final AccountRepository accountRepository;
+    private final CategoryRepository categoryRepository;
+    private final TagRepository tagRepository;
+    private final ImportBatchRepository importBatchRepository;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    public TransactionService(
+        TransactionRepository transactionRepository,
+        AccountRepository accountRepository,
+        CategoryRepository categoryRepository,
+        TagRepository tagRepository,
+        ImportBatchRepository importBatchRepository
+    ) {
         this.transactionRepository = transactionRepository;
+        this.accountRepository = accountRepository;
+        this.categoryRepository = categoryRepository;
+        this.tagRepository = tagRepository;
+        this.importBatchRepository = importBatchRepository;
     }
 
     @Transactional(readOnly = true)
@@ -42,6 +64,8 @@ public class TransactionService {
     public TransactionResponse updateTransaction(Integer id, TransactionUpdateRequest request) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new TransactionNotFoundException(id));
+
+        validateReferences(request);
 
         transaction.update(
             request.accountId(),
@@ -76,5 +100,23 @@ public class TransactionService {
             .and(tagIdEquals(filter.tagId()))
             .and(directionEquals(filter.direction()))
             .and(searchDescriptions(filter.search()));
+    }
+
+    private void validateReferences(TransactionUpdateRequest request) {
+        if (!accountRepository.existsById(request.accountId())) {
+            throw new AccountNotFoundException(request.accountId());
+        }
+
+        if (request.categoryId() != null && !categoryRepository.existsById(request.categoryId())) {
+            throw new CategoryNotFoundException(request.categoryId());
+        }
+
+        if (request.tagId() != null && !tagRepository.existsById(request.tagId())) {
+            throw new TagNotFoundException(request.tagId());
+        }
+
+        if (request.importBatchId() != null && !importBatchRepository.existsById(request.importBatchId())) {
+            throw new ImportBatchNotFoundException(request.importBatchId());
+        }
     }
 }

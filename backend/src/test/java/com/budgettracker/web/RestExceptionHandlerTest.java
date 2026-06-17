@@ -19,7 +19,7 @@ class RestExceptionHandlerTest {
 
     @Test
     void returnsConsistentMessageForUnexpectedErrors() {
-        var response = handler.handleUnexpected();
+        var response = handler.handleUnexpected(new IllegalStateException("Database exploded"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isEqualTo(ApiError.of("Something went wrong. Check the server logs for details."));

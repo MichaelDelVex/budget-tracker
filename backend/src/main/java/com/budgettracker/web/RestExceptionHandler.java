@@ -3,6 +3,7 @@ package com.budgettracker.web;
 import com.budgettracker.account.AccountNotFoundException;
 import com.budgettracker.category.CategoryNotFoundException;
 import com.budgettracker.importing.CsvImportException;
+import com.budgettracker.importing.ImportBatchNotFoundException;
 import com.budgettracker.rule.CategorisationRuleNotFoundException;
 import com.budgettracker.tag.TagNotFoundException;
 import com.budgettracker.importing.UnsupportedCsvFormatException;
@@ -19,9 +20,13 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class RestExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RestExceptionHandler.class);
 
     @ExceptionHandler(AccountNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(AccountNotFoundException exception) {
@@ -45,6 +50,11 @@ public class RestExceptionHandler {
 
     @ExceptionHandler(CategorisationRuleNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(CategorisationRuleNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
+    }
+
+    @ExceptionHandler(ImportBatchNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(ImportBatchNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
     }
 
@@ -81,7 +91,8 @@ public class RestExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpected() {
+    public ResponseEntity<ApiError> handleUnexpected(Exception exception) {
+        LOGGER.error("Unhandled API exception", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(ApiError.of("Something went wrong. Check the server logs for details."));
     }
