@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ImportBatchRepository extends JpaRepository<ImportBatch, Integer> {
 
-    List<ImportBatch> findByStatus(ImportBatchStatus status);
+    List<ImportBatch> findByAccountId(Integer accountId);
 }

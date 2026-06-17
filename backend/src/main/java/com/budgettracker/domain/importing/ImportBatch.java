@@ -2,15 +2,12 @@ package com.budgettracker.domain.importing;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
@@ -23,21 +20,32 @@ public class ImportBatch {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Min(1)
+    @Column(name = "account_id", nullable = false)
+    private Integer accountId;
+
     @NotBlank
     @Size(max = 255)
-    @Column(name = "source_filename", nullable = false)
-    private String sourceFilename;
-
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ImportBatchStatus status = ImportBatchStatus.PENDING;
+    @Column(name = "original_filename", nullable = false)
+    private String originalFilename;
 
     @Min(0)
-    @Column(name = "row_count", nullable = false)
-    private int rowCount;
+    @Column(name = "total_rows", nullable = false)
+    private int totalRows;
 
-    @Column(name = "imported_at")
+    @Min(0)
+    @Column(name = "imported_count", nullable = false)
+    private int importedCount;
+
+    @Min(0)
+    @Column(name = "duplicate_count", nullable = false)
+    private int duplicateCount;
+
+    @Min(0)
+    @Column(name = "failed_count", nullable = false)
+    private int failedCount;
+
+    @Column(name = "imported_at", nullable = false)
     private Instant importedAt;
 
     @CreationTimestamp
@@ -47,26 +55,50 @@ public class ImportBatch {
     protected ImportBatch() {
     }
 
-    public ImportBatch(String sourceFilename, ImportBatchStatus status, int rowCount) {
-        this.sourceFilename = sourceFilename;
-        this.status = status;
-        this.rowCount = rowCount;
+    public ImportBatch(
+        Integer accountId,
+        String originalFilename,
+        int totalRows,
+        int importedCount,
+        int duplicateCount,
+        int failedCount,
+        Instant importedAt
+    ) {
+        this.accountId = accountId;
+        this.originalFilename = originalFilename;
+        this.totalRows = totalRows;
+        this.importedCount = importedCount;
+        this.duplicateCount = duplicateCount;
+        this.failedCount = failedCount;
+        this.importedAt = importedAt;
     }
 
     public Integer getId() {
         return id;
     }
 
-    public String getSourceFilename() {
-        return sourceFilename;
+    public Integer getAccountId() {
+        return accountId;
     }
 
-    public ImportBatchStatus getStatus() {
-        return status;
+    public String getOriginalFilename() {
+        return originalFilename;
     }
 
-    public int getRowCount() {
-        return rowCount;
+    public int getTotalRows() {
+        return totalRows;
+    }
+
+    public int getImportedCount() {
+        return importedCount;
+    }
+
+    public int getDuplicateCount() {
+        return duplicateCount;
+    }
+
+    public int getFailedCount() {
+        return failedCount;
     }
 
     public Instant getImportedAt() {

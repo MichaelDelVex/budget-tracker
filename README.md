@@ -103,6 +103,21 @@ Transaction update request body:
 }
 ```
 
+CSV import endpoint:
+
+```http
+POST /api/imports/transactions
+```
+
+Multipart form fields:
+
+```text
+accountId
+file
+```
+
+The initial parser supports NAB-style CSV exports. Duplicate detection is intentionally deferred.
+
 ## Run Locally
 
 Requirements:

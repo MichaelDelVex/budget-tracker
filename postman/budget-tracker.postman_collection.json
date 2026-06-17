@@ -214,6 +214,39 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Imports",
+      "item": [
+        {
+          "name": "Import Transactions CSV",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "accountId",
+                  "value": "{{accountId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/imports/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "imports", "transactions"]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [

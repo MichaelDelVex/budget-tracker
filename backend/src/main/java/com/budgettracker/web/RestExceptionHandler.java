@@ -1,14 +1,19 @@
 package com.budgettracker.web;
 
 import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.importing.CsvImportException;
+import com.budgettracker.importing.UnsupportedCsvFormatException;
 import com.budgettracker.transaction.TransactionNotFoundException;
+import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class RestExceptionHandler {
@@ -31,5 +36,16 @@ public class RestExceptionHandler {
         );
 
         return ResponseEntity.badRequest().body(new ApiError("Validation failed", fields));
+    }
+
+    @ExceptionHandler({
+        UnsupportedCsvFormatException.class,
+        CsvImportException.class,
+        MissingServletRequestParameterException.class,
+        MissingServletRequestPartException.class,
+        ConstraintViolationException.class
+    })
+    public ResponseEntity<ApiError> handleBadRequest(Exception exception) {
+        return ResponseEntity.badRequest().body(ApiError.of(exception.getMessage()));
     }
 }
