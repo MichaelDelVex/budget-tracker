@@ -24,6 +24,8 @@ budget-tracker/
 
 This project starts as a single-user local application. The backend owns data access and exposes a REST API. The frontend is a separate Vite app so it can evolve independently while still living in the same repository.
 
+The frontend MVP includes dashboard, transaction review, CSV import, category/tag management, and categorisation rule management screens. During local development, Vite proxies `/api` requests to the Spring Boot backend on port `8080`.
+
 SQLite is configured as the local database at `backend/data/budget-tracker.sqlite`. The `backend/data/` folder is ignored by Git so local budget data is not committed.
 
 Database schema changes are managed with Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the schema at startup, but Flyway owns creating and changing tables.
@@ -174,6 +176,8 @@ npm run dev
 ```
 
 The app runs at `http://localhost:5173`.
+
+Frontend routes are hash-based: `#/dashboard`, `#/transactions`, `#/import`, `#/categories-tags`, and `#/rules`.
 
 ## Test and Build
 
