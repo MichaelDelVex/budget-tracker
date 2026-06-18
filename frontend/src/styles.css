@@ -34,6 +34,11 @@ button:hover {
   border-color: #55728c;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 input,
 select {
   width: 100%;
@@ -182,6 +187,27 @@ p {
 
 .table-wrap {
   overflow-x: auto;
+}
+
+.pagination-bar {
+  align-items: end;
+  border: 1px solid #d8e0e7;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) 7rem auto;
+  padding: 0.85rem 1rem;
+}
+
+.pagination-bar p {
+  color: #51606f;
+  margin-bottom: 0;
+}
+
+.pagination-bar > div {
+  display: flex;
+  gap: 0.45rem;
 }
 
 table {
@@ -464,6 +490,15 @@ th {
 
   .two-column {
     grid-template-columns: 1fr;
+  }
+
+  .pagination-bar {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-bar > div {
+    justify-content: start;
   }
 }
 

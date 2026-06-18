@@ -19,6 +19,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,10 +85,49 @@ public class RestExceptionHandler {
         return ResponseEntity.badRequest().body(ApiError.of("Request body is invalid or malformed."));
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleUploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ApiError.of("CSV file is too large. Use a file up to 5 MB."));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiError> handleConflict() {
+    public ResponseEntity<ApiError> handleConflict(DataIntegrityViolationException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(ApiError.of("Cannot delete or update this resource because it is still referenced."));
+            .body(ApiError.of(conflictMessage(exception)));
+    }
+
+    private String conflictMessage(DataIntegrityViolationException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+        if (message == null) {
+            message = exception.getMessage();
+        }
+        String lowerMessage = message == null ? "" : message.toLowerCase();
+
+        if (lowerMessage.contains("transaction_record.account_id")
+            && lowerMessage.contains("transaction_record.transaction_date")
+            && lowerMessage.contains("transaction_record.description")
+            && lowerMessage.contains("transaction_record.amount")) {
+            return "This transaction already exists.";
+        }
+
+        if (lowerMessage.contains("account.name")) {
+            return "An account with this name already exists.";
+        }
+
+        if (lowerMessage.contains("category.name")) {
+            return "A category with this name already exists.";
+        }
+
+        if (lowerMessage.contains("tag.name")) {
+            return "A tag with this name already exists.";
+        }
+
+        if (lowerMessage.contains("foreign key constraint failed")) {
+            return "Cannot delete or update this resource because it is still referenced.";
+        }
+
+        return "Cannot save this change because it conflicts with existing data.";
     }
 
     @ExceptionHandler(Exception.class)

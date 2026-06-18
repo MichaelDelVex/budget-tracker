@@ -32,6 +32,47 @@ SQLite data is stored at `backend/data/budget-tracker.sqlite`. The `backend/data
 
 Default categories and property-report tags are seeded by migrations so a fresh database has useful starting data.
 
+SQLite foreign key checks are enabled for every application database connection. SQLite requires this per connection, so the app sets `PRAGMA foreign_keys=ON` when connections are opened.
+
+## Local Database Safety
+
+The local SQLite database contains sensitive financial data. Do not commit it, upload it to issue trackers, or share it in logs/screenshots unless you have intentionally scrubbed it.
+
+Default database path:
+
+```text
+backend/data/budget-tracker.sqlite
+```
+
+Back up the database while the backend is stopped:
+
+```powershell
+Copy-Item backend/data/budget-tracker.sqlite backend/data/budget-tracker.backup.sqlite
+```
+
+Restore from a backup while the backend is stopped:
+
+```powershell
+Copy-Item backend/data/budget-tracker.backup.sqlite backend/data/budget-tracker.sqlite
+```
+
+Reset the app to a fresh database while the backend is stopped:
+
+```powershell
+Remove-Item backend/data/budget-tracker.sqlite
+```
+
+The next backend startup will recreate the schema with Flyway migrations and seed data.
+
+To use a different database path, override the datasource URL when starting the backend:
+
+```powershell
+$env:SPRING_DATASOURCE_URL = "jdbc:sqlite:C:/Users/YourName/budget-data/budget-tracker.sqlite"
+mvn spring-boot:run
+```
+
+Keep backups somewhere private and included in your normal machine backup routine.
+
 ## Run the Backend
 
 Requirements:

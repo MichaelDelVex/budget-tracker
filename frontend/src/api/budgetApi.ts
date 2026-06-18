@@ -95,8 +95,12 @@ export function deleteRule(id: number) {
   return request<void>(`/api/categorisation-rules/${id}`, { method: 'DELETE' });
 }
 
-export function getTransactions(filters: TransactionFilters = {}) {
-  const params = new URLSearchParams({ page: '0', size: '50', sort: 'transactionDate,desc' });
+export function getTransactions(filters: TransactionFilters = {}, page = 0, size = 50) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: 'transactionDate,desc',
+  });
   Object.entries(filters).forEach(([key, value]) => {
     if (value) {
       params.set(key, value);

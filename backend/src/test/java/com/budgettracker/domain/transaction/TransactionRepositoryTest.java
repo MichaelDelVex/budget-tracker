@@ -133,6 +133,44 @@ class TransactionRepositoryTest {
         assertThat(transactionRepository.saveAndFlush(otherAccountTransaction).getId()).isNotNull();
     }
 
+    @Test
+    void rejectsTransactionWithMissingAccountReference() {
+        Transaction transaction = new Transaction(
+            999_999,
+            LocalDate.of(2026, 1, 10),
+            "Missing account",
+            "Raw Missing account",
+            new BigDecimal("42.50"),
+            TransactionDirection.EXPENSE,
+            categoryId,
+            tagId,
+            null
+        );
+
+        assertThatThrownBy(() -> transactionRepository.saveAndFlush(transaction))
+            .hasMessageContaining("FOREIGN KEY constraint failed");
+    }
+
+    @Test
+    void preventsDeletingReferencedAccount() {
+        transactionRepository.saveAndFlush(sampleTransaction("Referenced account", TransactionDirection.EXPENSE));
+
+        assertThatThrownBy(() -> {
+            accountRepository.deleteById(accountId);
+            accountRepository.flush();
+        }).hasMessageContaining("FOREIGN KEY constraint failed");
+    }
+
+    @Test
+    void preventsDeletingReferencedCategory() {
+        transactionRepository.saveAndFlush(sampleTransaction("Referenced category", TransactionDirection.EXPENSE));
+
+        assertThatThrownBy(() -> {
+            categoryRepository.deleteById(categoryId);
+            categoryRepository.flush();
+        }).hasMessageContaining("FOREIGN KEY constraint failed");
+    }
+
     private Transaction sampleTransaction(String description, TransactionDirection direction) {
         return new Transaction(
             accountId,

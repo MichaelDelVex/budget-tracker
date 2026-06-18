@@ -13,6 +13,10 @@ export function TransactionsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filters, setFilters] = useState<TransactionFilters>({});
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +33,12 @@ export function TransactionsPage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getTransactions(filters)
+    getTransactions(filters, page, pageSize)
       .then((response) => {
         if (active) {
           setTransactions(response.content);
+          setTotalElements(response.totalElements);
+          setTotalPages(response.totalPages);
           setError(null);
         }
       })
@@ -50,10 +56,16 @@ export function TransactionsPage() {
     return () => {
       active = false;
     };
-  }, [filters]);
+  }, [filters, page, pageSize]);
 
   function setFilter(key: keyof TransactionFilters, value: string) {
     setFilters((current) => ({ ...current, [key]: value || undefined }));
+    setPage(0);
+  }
+
+  function changePageSize(value: string) {
+    setPageSize(Number(value));
+    setPage(0);
   }
 
   async function editAssignment(transaction: Transaction, field: 'categoryId' | 'tagId', value: string) {
@@ -72,6 +84,11 @@ export function TransactionsPage() {
     }
   }
 
+  const firstVisible = totalElements === 0 ? 0 : page * pageSize + 1;
+  const lastVisible = Math.min((page * pageSize) + transactions.length, totalElements);
+  const canGoPrevious = page > 0;
+  const canGoNext = totalPages > 0 && page < totalPages - 1;
+
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -88,6 +105,28 @@ export function TransactionsPage() {
         <label>Tag<select onChange={(event) => setFilter('tagId', event.target.value)}><option value="">All</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
         <label>Direction<select onChange={(event) => setFilter('direction', event.target.value)}><option value="">All</option><option value="INCOME">Income</option><option value="EXPENSE">Expense</option></select></label>
         <label className="wide-field">Search<input placeholder="Description" onChange={(event) => setFilter('search', event.target.value)} /></label>
+      </div>
+      <div className="pagination-bar" aria-label="Transaction pagination">
+        <p>
+          Showing {firstVisible}-{lastVisible} of {totalElements} transactions
+          {totalPages > 0 ? ` - page ${page + 1} of ${totalPages}` : ''}
+        </p>
+        <label>
+          Rows
+          <select value={pageSize} onChange={(event) => changePageSize(event.target.value)}>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+        <div>
+          <button type="button" disabled={!canGoPrevious} onClick={() => setPage((current) => Math.max(0, current - 1))}>
+            Previous
+          </button>
+          <button type="button" disabled={!canGoNext} onClick={() => setPage((current) => current + 1)}>
+            Next
+          </button>
+        </div>
       </div>
       {loading ? <LoadingState label="Loading transactions" /> : null}
       <ErrorMessage message={error} />

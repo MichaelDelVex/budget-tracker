@@ -131,6 +131,23 @@ describe('App', () => {
     });
   });
 
+  it('paginates transactions so more than the first page is reachable', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn(mockPaginatedTransactionFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /transactions/i }));
+
+    expect(await screen.findByText(/showing 1-50 of 75 transactions/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^next$/i }));
+
+    await waitFor(() => {
+      const calls = fetchCalls().map((url) => url.toString());
+      expect(calls.some((url) => url.includes('/api/transactions') && url.includes('page=1'))).toBe(true);
+    });
+    expect(await screen.findByText(/showing 51-75 of 75 transactions/i)).toBeInTheDocument();
+  });
+
   it('validates missing account and file on import form', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -156,6 +173,20 @@ describe('App', () => {
     const summary = await screen.findByLabelText(/import summary/i);
     expect(within(summary).getByText(/total rows/i)).toBeInTheDocument();
     expect(within(summary).getByText('2')).toBeInTheDocument();
+  });
+
+  it('displays oversized CSV upload errors', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'large-transactions.csv', { type: 'text/csv' });
+    vi.stubGlobal('fetch', vi.fn(mockOversizedUploadFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    expect(await screen.findByText(/csv file is too large/i)).toBeInTheDocument();
   });
 
   it('renders category and tag forms', async () => {
@@ -272,6 +303,50 @@ async function mockEmptyReportFetch(input: RequestInfo | URL) {
     return json([]);
   }
   return mockFetch(input);
+}
+
+async function mockPaginatedTransactionFetch(input: RequestInfo | URL) {
+  const url = input.toString();
+  if (url.startsWith('/api/transactions')) {
+    const params = new URLSearchParams(url.split('?')[1] ?? '');
+    const page = Number(params.get('page') ?? '0');
+    const pageTransactions = page === 0
+      ? Array.from({ length: 50 }, (_, index) => transactionItem(index + 1))
+      : Array.from({ length: 25 }, (_, index) => transactionItem(index + 51));
+
+    return json({
+      content: pageTransactions,
+      totalElements: 75,
+      totalPages: 2,
+      page,
+      size: 50,
+    });
+  }
+
+  return mockFetch(input);
+}
+
+async function mockOversizedUploadFetch(input: RequestInfo | URL) {
+  const url = input.toString();
+  if (url.startsWith('/api/imports/transactions')) {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'CSV file is too large. Use a file up to 5 MB.',
+      fields: {},
+    }), {
+      status: 413,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+function transactionItem(id: number) {
+  return {
+    ...transactions.content[0],
+    id,
+    description: `Transaction ${id}`,
+  };
 }
 
 function json(body: unknown) {
