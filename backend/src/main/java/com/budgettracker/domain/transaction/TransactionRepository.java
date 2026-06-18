@@ -40,4 +40,63 @@ public interface TransactionRepository
         @Param("dateFrom") LocalDate dateFrom,
         @Param("dateTo") LocalDate dateTo
     );
+
+    @Query("""
+        select
+            coalesce(sum(case when transaction.direction = :income then transaction.amount else 0 end), 0) as totalIncome,
+            coalesce(sum(case when transaction.direction = :expense then transaction.amount else 0 end), 0) as totalExpenses,
+            count(transaction) as transactionCount
+        from Transaction transaction
+        where (:dateFrom is null or transaction.transactionDate >= :dateFrom)
+            and (:dateTo is null or transaction.transactionDate <= :dateTo)
+            and (:accountId is null or transaction.accountId = :accountId)
+        """)
+    TransactionSummaryView summarizeTransactions(
+        @Param("dateFrom") LocalDate dateFrom,
+        @Param("dateTo") LocalDate dateTo,
+        @Param("accountId") Integer accountId,
+        @Param("income") TransactionDirection income,
+        @Param("expense") TransactionDirection expense
+    );
+
+    @Query("""
+        select
+            transaction.categoryId as categoryId,
+            category.name as categoryName,
+            sum(transaction.amount) as totalAmount
+        from Transaction transaction
+        left join Category category on category.id = transaction.categoryId
+        where transaction.direction = :expense
+            and (:dateFrom is null or transaction.transactionDate >= :dateFrom)
+            and (:dateTo is null or transaction.transactionDate <= :dateTo)
+            and (:accountId is null or transaction.accountId = :accountId)
+        group by transaction.categoryId, category.name
+        order by sum(transaction.amount) desc
+        """)
+    List<CategorySpendingView> summarizeSpendingByCategory(
+        @Param("dateFrom") LocalDate dateFrom,
+        @Param("dateTo") LocalDate dateTo,
+        @Param("accountId") Integer accountId,
+        @Param("expense") TransactionDirection expense
+    );
+
+    @Query("""
+        select
+            transaction.transactionDate as transactionDate,
+            coalesce(sum(case when transaction.direction = :income then transaction.amount else 0 end), 0) as totalIncome,
+            coalesce(sum(case when transaction.direction = :expense then transaction.amount else 0 end), 0) as totalExpenses
+        from Transaction transaction
+        where (:dateFrom is null or transaction.transactionDate >= :dateFrom)
+            and (:dateTo is null or transaction.transactionDate <= :dateTo)
+            and (:accountId is null or transaction.accountId = :accountId)
+        group by transaction.transactionDate
+        order by transaction.transactionDate
+        """)
+    List<DailyIncomeExpenseView> summarizeIncomeVsExpensesByDate(
+        @Param("dateFrom") LocalDate dateFrom,
+        @Param("dateTo") LocalDate dateTo,
+        @Param("accountId") Integer accountId,
+        @Param("income") TransactionDirection income,
+        @Param("expense") TransactionDirection expense
+    );
 }

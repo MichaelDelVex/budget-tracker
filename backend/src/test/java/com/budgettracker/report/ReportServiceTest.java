@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.budgettracker.domain.category.Category;
-import com.budgettracker.domain.category.CategoryRepository;
-import com.budgettracker.domain.category.CategoryType;
 import com.budgettracker.domain.tag.Tag;
 import com.budgettracker.domain.tag.TagRepository;
+import com.budgettracker.domain.transaction.CategorySpendingView;
+import com.budgettracker.domain.transaction.DailyIncomeExpenseView;
 import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
+import com.budgettracker.domain.transaction.TransactionSummaryView;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -30,9 +30,6 @@ class ReportServiceTest {
     private TransactionRepository transactionRepository;
 
     @Mock
-    private CategoryRepository categoryRepository;
-
-    @Mock
     private TagRepository tagRepository;
 
     @InjectMocks
@@ -40,10 +37,13 @@ class ReportServiceTest {
 
     @Test
     void calculatesSummary() {
-        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
-            transaction("Salary", "1000.00", TransactionDirection.INCOME, null, 1, LocalDate.of(2026, 1, 10)),
-            transaction("Groceries", "250.00", TransactionDirection.EXPENSE, 2, 1, LocalDate.of(2026, 1, 11))
-        ));
+        when(transactionRepository.summarizeTransactions(
+            null,
+            null,
+            null,
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        )).thenReturn(summary("1000.00", "250.00", 2));
 
         SummaryReportResponse response = reportService.summary(filter());
 
@@ -56,13 +56,14 @@ class ReportServiceTest {
 
     @Test
     void calculatesSpendingByCategory() {
-        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
-            transaction("Groceries", "60.00", TransactionDirection.EXPENSE, 2, 1, LocalDate.of(2026, 1, 10)),
-            transaction("Dining", "40.00", TransactionDirection.EXPENSE, 3, 1, LocalDate.of(2026, 1, 11))
-        ));
-        when(categoryRepository.findAllById(List.of(2, 3))).thenReturn(List.of(
-            category(2, "Groceries"),
-            category(3, "Dining")
+        when(transactionRepository.summarizeSpendingByCategory(
+            null,
+            null,
+            null,
+            TransactionDirection.EXPENSE
+        )).thenReturn(List.of(
+            categorySpending(2, "Groceries", "60.00"),
+            categorySpending(3, "Dining", "40.00")
         ));
 
         List<SpendingByCategoryResponse> response = reportService.spendingByCategory(filter());
@@ -75,10 +76,16 @@ class ReportServiceTest {
 
     @Test
     void groupsIncomeVsExpensesByMonth() {
-        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
-            transaction("Salary", "1000.00", TransactionDirection.INCOME, null, 1, LocalDate.of(2026, 1, 10)),
-            transaction("Rent", "500.00", TransactionDirection.EXPENSE, 2, 1, LocalDate.of(2026, 1, 11)),
-            transaction("Salary", "1100.00", TransactionDirection.INCOME, null, 1, LocalDate.of(2026, 2, 10))
+        when(transactionRepository.summarizeIncomeVsExpensesByDate(
+            null,
+            null,
+            null,
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        )).thenReturn(List.of(
+            daily(LocalDate.of(2026, 1, 10), "1000.00", "0.00"),
+            daily(LocalDate.of(2026, 1, 11), "0.00", "500.00"),
+            daily(LocalDate.of(2026, 2, 10), "1100.00", "0.00")
         ));
 
         List<IncomeVsExpensesResponse> response = reportService.incomeVsExpenses(filter());
@@ -92,9 +99,15 @@ class ReportServiceTest {
 
     @Test
     void supportsFortnightGrouping() {
-        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of(
-            transaction("Early", "10.00", TransactionDirection.EXPENSE, 2, 1, LocalDate.of(2026, 1, 14)),
-            transaction("Late", "20.00", TransactionDirection.EXPENSE, 2, 1, LocalDate.of(2026, 1, 15))
+        when(transactionRepository.summarizeIncomeVsExpensesByDate(
+            null,
+            null,
+            null,
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        )).thenReturn(List.of(
+            daily(LocalDate.of(2026, 1, 14), "0.00", "10.00"),
+            daily(LocalDate.of(2026, 1, 15), "0.00", "20.00")
         ));
 
         List<IncomeVsExpensesResponse> response = reportService.incomeVsExpenses(
@@ -104,6 +117,50 @@ class ReportServiceTest {
         assertThat(response)
             .extracting(IncomeVsExpensesResponse::period)
             .containsExactly("2026-01 F1", "2026-01 F2");
+    }
+
+    @Test
+    void emptySummaryReturnsZeroValues() {
+        when(transactionRepository.summarizeTransactions(
+            null,
+            null,
+            null,
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        )).thenReturn(summary(null, null, 0));
+
+        SummaryReportResponse response = reportService.summary(filter());
+
+        assertThat(response.totalIncome()).isEqualByComparingTo("0.00");
+        assertThat(response.totalExpenses()).isEqualByComparingTo("0.00");
+        assertThat(response.netSavings()).isEqualByComparingTo("0.00");
+        assertThat(response.savingsPercentage()).isEqualByComparingTo("0.00");
+        assertThat(response.transactionCount()).isZero();
+    }
+
+    @Test
+    void emptySpendingByCategoryReturnsEmptyList() {
+        when(transactionRepository.summarizeSpendingByCategory(
+            null,
+            null,
+            null,
+            TransactionDirection.EXPENSE
+        )).thenReturn(List.of());
+
+        assertThat(reportService.spendingByCategory(filter())).isEmpty();
+    }
+
+    @Test
+    void emptyIncomeVsExpensesReturnsEmptyList() {
+        when(transactionRepository.summarizeIncomeVsExpensesByDate(
+            null,
+            null,
+            null,
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        )).thenReturn(List.of());
+
+        assertThat(reportService.incomeVsExpenses(filter())).isEmpty();
     }
 
     @Test
@@ -198,15 +255,66 @@ class ReportServiceTest {
         );
     }
 
-    private Category category(Integer id, String name) {
-        Category category = new Category(name, CategoryType.EXPENSE, true, id);
-        ReflectionTestUtils.setField(category, "id", id);
-        return category;
-    }
-
     private Tag tag(Integer id, String name) {
         Tag tag = new Tag(name, "#336699");
         ReflectionTestUtils.setField(tag, "id", id);
         return tag;
+    }
+
+    private TransactionSummaryView summary(String totalIncome, String totalExpenses, long transactionCount) {
+        return new TransactionSummaryView() {
+            @Override
+            public BigDecimal getTotalIncome() {
+                return totalIncome == null ? null : new BigDecimal(totalIncome);
+            }
+
+            @Override
+            public BigDecimal getTotalExpenses() {
+                return totalExpenses == null ? null : new BigDecimal(totalExpenses);
+            }
+
+            @Override
+            public long getTransactionCount() {
+                return transactionCount;
+            }
+        };
+    }
+
+    private CategorySpendingView categorySpending(Integer categoryId, String categoryName, String totalAmount) {
+        return new CategorySpendingView() {
+            @Override
+            public Integer getCategoryId() {
+                return categoryId;
+            }
+
+            @Override
+            public String getCategoryName() {
+                return categoryName;
+            }
+
+            @Override
+            public BigDecimal getTotalAmount() {
+                return new BigDecimal(totalAmount);
+            }
+        };
+    }
+
+    private DailyIncomeExpenseView daily(LocalDate transactionDate, String totalIncome, String totalExpenses) {
+        return new DailyIncomeExpenseView() {
+            @Override
+            public LocalDate getTransactionDate() {
+                return transactionDate;
+            }
+
+            @Override
+            public BigDecimal getTotalIncome() {
+                return new BigDecimal(totalIncome);
+            }
+
+            @Override
+            public BigDecimal getTotalExpenses() {
+                return new BigDecimal(totalExpenses);
+            }
+        };
     }
 }

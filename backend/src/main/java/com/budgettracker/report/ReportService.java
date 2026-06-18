@@ -4,13 +4,14 @@ import static com.budgettracker.domain.transaction.TransactionSpecifications.acc
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrAfter;
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrBefore;
 
-import com.budgettracker.domain.category.Category;
-import com.budgettracker.domain.category.CategoryRepository;
 import com.budgettracker.domain.tag.Tag;
 import com.budgettracker.domain.tag.TagRepository;
+import com.budgettracker.domain.transaction.CategorySpendingView;
+import com.budgettracker.domain.transaction.DailyIncomeExpenseView;
 import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
+import com.budgettracker.domain.transaction.TransactionSummaryView;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -33,24 +34,27 @@ public class ReportService {
     private static final String UNCATEGORISED = "Uncategorised";
 
     private final TransactionRepository transactionRepository;
-    private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
 
     public ReportService(
         TransactionRepository transactionRepository,
-        CategoryRepository categoryRepository,
         TagRepository tagRepository
     ) {
         this.transactionRepository = transactionRepository;
-        this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
     }
 
     @Transactional(readOnly = true)
     public SummaryReportResponse summary(ReportFilterRequest filter) {
-        List<Transaction> transactions = findTransactions(filter);
-        BigDecimal totalIncome = total(transactions, TransactionDirection.INCOME);
-        BigDecimal totalExpenses = total(transactions, TransactionDirection.EXPENSE);
+        TransactionSummaryView summary = transactionRepository.summarizeTransactions(
+            filter.dateFrom(),
+            filter.dateTo(),
+            filter.accountId(),
+            TransactionDirection.INCOME,
+            TransactionDirection.EXPENSE
+        );
+        BigDecimal totalIncome = zeroIfNull(summary.getTotalIncome());
+        BigDecimal totalExpenses = zeroIfNull(summary.getTotalExpenses());
         BigDecimal netSavings = totalIncome.subtract(totalExpenses);
 
         return new SummaryReportResponse(
@@ -58,45 +62,40 @@ public class ReportService {
             money(totalExpenses),
             money(netSavings),
             percentage(netSavings, totalIncome),
-            transactions.size()
+            summary.getTransactionCount()
         );
     }
 
     @Transactional(readOnly = true)
     public List<SpendingByCategoryResponse> spendingByCategory(ReportFilterRequest filter) {
-        List<Transaction> expenses = findTransactions(filter).stream()
-            .filter(transaction -> transaction.getDirection() == TransactionDirection.EXPENSE)
-            .toList();
-        BigDecimal totalExpenses = expenses.stream()
-            .map(Transaction::getAmount)
+        List<CategorySpendingView> spending = transactionRepository.summarizeSpendingByCategory(
+            filter.dateFrom(),
+            filter.dateTo(),
+            filter.accountId(),
+            TransactionDirection.EXPENSE
+        );
+        BigDecimal totalExpenses = spending.stream()
+            .map(CategorySpendingView::getTotalAmount)
+            .map(this::zeroIfNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        Map<Integer, Category> categories = categoryRepository.findAllById(
-            expenses.stream()
-                .map(Transaction::getCategoryId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList()
-        ).stream().collect(Collectors.toMap(Category::getId, Function.identity()));
 
-        Map<Integer, List<Transaction>> byCategory = new LinkedHashMap<>();
-        for (Transaction transaction : expenses) {
-            byCategory.computeIfAbsent(transaction.getCategoryId(), ignored -> new java.util.ArrayList<>())
-                .add(transaction);
-        }
-
-        return byCategory
-            .entrySet()
-            .stream()
-            .map(entry -> spendingResponse(entry.getKey(), entry.getValue(), categories, totalExpenses))
-            .sorted(Comparator.comparing(SpendingByCategoryResponse::totalAmount).reversed())
+        return spending.stream()
+            .map(row -> spendingResponse(row, totalExpenses))
             .toList();
     }
 
     @Transactional(readOnly = true)
     public List<IncomeVsExpensesResponse> incomeVsExpenses(ReportFilterRequest filter) {
-        return findTransactions(filter).stream()
+        return transactionRepository.summarizeIncomeVsExpensesByDate(
+                filter.dateFrom(),
+                filter.dateTo(),
+                filter.accountId(),
+                TransactionDirection.INCOME,
+                TransactionDirection.EXPENSE
+            )
+            .stream()
             .collect(Collectors.groupingBy(
-                transaction -> period(transaction.getTransactionDate(), filter.grouping()),
+                row -> period(row.getTransactionDate(), filter.grouping()),
                 LinkedHashMap::new,
                 Collectors.toList()
             ))
@@ -166,30 +165,27 @@ public class ReportService {
         return transactionRepository.findAll(specification);
     }
 
-    private SpendingByCategoryResponse spendingResponse(
-        Integer categoryId,
-        List<Transaction> transactions,
-        Map<Integer, Category> categories,
-        BigDecimal totalExpenses
-    ) {
-        BigDecimal totalAmount = transactions.stream()
-            .map(Transaction::getAmount)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        String categoryName = categoryId == null
-            ? UNCATEGORISED
-            : Optional.ofNullable(categories.get(categoryId)).map(Category::getName).orElse(UNCATEGORISED);
+    private SpendingByCategoryResponse spendingResponse(CategorySpendingView spending, BigDecimal totalExpenses) {
+        BigDecimal totalAmount = zeroIfNull(spending.getTotalAmount());
+        String categoryName = Optional.ofNullable(spending.getCategoryName()).orElse(UNCATEGORISED);
 
         return new SpendingByCategoryResponse(
-            categoryId,
+            spending.getCategoryId(),
             categoryName,
             money(totalAmount),
             percentage(totalAmount, totalExpenses)
         );
     }
 
-    private IncomeVsExpensesResponse incomeVsExpensesResponse(String period, List<Transaction> transactions) {
-        BigDecimal totalIncome = total(transactions, TransactionDirection.INCOME);
-        BigDecimal totalExpenses = total(transactions, TransactionDirection.EXPENSE);
+    private IncomeVsExpensesResponse incomeVsExpensesResponse(String period, List<DailyIncomeExpenseView> rows) {
+        BigDecimal totalIncome = rows.stream()
+            .map(DailyIncomeExpenseView::getTotalIncome)
+            .map(this::zeroIfNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalExpenses = rows.stream()
+            .map(DailyIncomeExpenseView::getTotalExpenses)
+            .map(this::zeroIfNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new IncomeVsExpensesResponse(
             period,
             money(totalIncome),
@@ -245,5 +241,9 @@ public class ReportService {
 
     private BigDecimal money(BigDecimal value) {
         return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }
