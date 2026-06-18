@@ -38,6 +38,8 @@ SQLite foreign key checks are enabled for every application database connection.
 
 The local SQLite database contains sensitive financial data. Do not commit it, upload it to issue trackers, or share it in logs/screenshots unless you have intentionally scrubbed it.
 
+DELETE endpoints permanently remove local financial data. Back up the SQLite database before using destructive API requests directly.
+
 Default database path:
 
 ```text
@@ -224,6 +226,21 @@ PUT /api/categorisation-rules/{id}
 DELETE /api/categorisation-rules/{id}
 ```
 
+Budgets:
+
+```http
+GET /api/budgets/profiles
+POST /api/budgets/profiles
+PUT /api/budgets/profiles/{id}
+DELETE /api/budgets/profiles/{id}
+GET /api/budgets/profiles/{profileId}/nodes
+POST /api/budgets/profiles/{profileId}/nodes
+PUT /api/budgets/nodes/{id}
+DELETE /api/budgets/nodes/{id}
+```
+
+Budget profiles can be saved as drafts with incomplete node percentages. A profile can only be activated when each sibling group totals exactly `100%`. Draft node changes cannot push a sibling group above `100%`.
+
 Reports:
 
 ```http
@@ -253,6 +270,8 @@ Collection variables:
 - `categoryId`: used by category and rule examples
 - `tagId`: used by tag and rule examples
 - `categorisationRuleId`: used by rule update/delete requests
+- `budgetProfileId`: used by budget node requests
+- `budgetNodeId`: used by budget node update/delete requests
 
 Start the backend before sending requests. Create or update variable values as you create local records.
 

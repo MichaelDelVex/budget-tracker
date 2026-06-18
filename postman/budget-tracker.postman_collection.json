@@ -441,6 +441,151 @@
       ]
     },
     {
+      "name": "Budgets",
+      "item": [
+        {
+          "name": "List Budget Profiles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Budget Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Default Budget\",\n  \"description\": \"Main budget plan\",\n  \"active\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Budget Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Default Budget\",\n  \"description\": \"Main budget plan\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles/{{budgetProfileId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles", "{{budgetProfileId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Budget Profile",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles/{{budgetProfileId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles", "{{budgetProfileId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Budget Nodes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles/{{budgetProfileId}}/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles", "{{budgetProfileId}}", "nodes"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Budget Node",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentNodeId\": null,\n  \"name\": \"Savings\",\n  \"percentage\": 40.00,\n  \"categoryId\": null,\n  \"sortOrder\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/profiles/{{budgetProfileId}}/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "profiles", "{{budgetProfileId}}", "nodes"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Budget Node",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentNodeId\": null,\n  \"name\": \"Savings\",\n  \"percentage\": 40.00,\n  \"categoryId\": null,\n  \"sortOrder\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/nodes/{{budgetNodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "nodes", "{{budgetNodeId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Budget Node",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/budgets/nodes/{{budgetNodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "budgets", "nodes", "{{budgetNodeId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Reports",
       "item": [
         {
@@ -614,6 +759,14 @@
     },
     {
       "key": "categorisationRuleId",
+      "value": "1"
+    },
+    {
+      "key": "budgetProfileId",
+      "value": "1"
+    },
+    {
+      "key": "budgetNodeId",
       "value": "1"
     }
   ]

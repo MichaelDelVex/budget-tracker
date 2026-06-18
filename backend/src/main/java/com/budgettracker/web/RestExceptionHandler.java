@@ -1,6 +1,9 @@
 package com.budgettracker.web;
 
 import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.budget.BudgetNodeNotFoundException;
+import com.budgettracker.budget.BudgetProfileNotFoundException;
+import com.budgettracker.budget.BudgetValidationException;
 import com.budgettracker.category.CategoryNotFoundException;
 import com.budgettracker.importing.CsvImportException;
 import com.budgettracker.importing.ImportBatchNotFoundException;
@@ -60,6 +63,16 @@ public class RestExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
     }
 
+    @ExceptionHandler(BudgetProfileNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(BudgetProfileNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
+    }
+
+    @ExceptionHandler(BudgetNodeNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(BudgetNodeNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(exception.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException exception) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -73,6 +86,7 @@ public class RestExceptionHandler {
     @ExceptionHandler({
         UnsupportedCsvFormatException.class,
         CsvImportException.class,
+        BudgetValidationException.class,
         MissingServletRequestParameterException.class,
         MissingServletRequestPartException.class,
         ConstraintViolationException.class
