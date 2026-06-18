@@ -2,6 +2,8 @@ package com.budgettracker.account;
 
 import com.budgettracker.domain.account.Account;
 import com.budgettracker.domain.account.AccountRepository;
+import com.budgettracker.domain.importing.ImportBatchRepository;
+import com.budgettracker.domain.transaction.TransactionRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,9 +12,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
+    private final ImportBatchRepository importBatchRepository;
 
-    public AccountService(AccountRepository accountRepository) {
+    public AccountService(
+        AccountRepository accountRepository,
+        TransactionRepository transactionRepository,
+        ImportBatchRepository importBatchRepository
+    ) {
         this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.importBatchRepository = importBatchRepository;
     }
 
     @Transactional(readOnly = true)
@@ -52,4 +62,16 @@ public class AccountService {
 
         accountRepository.deleteById(id);
     }
+
+    @Transactional
+    public void deleteAccountWithTransactions(Integer id) {
+        if (!accountRepository.existsById(id)) {
+            throw new AccountNotFoundException(id);
+        }
+
+        transactionRepository.deleteByAccountId(id);
+        importBatchRepository.deleteByAccountId(id);
+        accountRepository.deleteById(id);
+    }
+
 }

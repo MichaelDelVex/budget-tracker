@@ -39,6 +39,16 @@ button:disabled {
   opacity: 0.55;
 }
 
+.danger-button {
+  border-color: #c2410c;
+  color: #9a3412;
+}
+
+.danger-button:hover {
+  border-color: #9a3412;
+  background: #fff7ed;
+}
+
 input,
 select {
   width: 100%;

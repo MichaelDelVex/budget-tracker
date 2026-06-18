@@ -8,20 +8,30 @@ import static org.mockito.Mockito.when;
 import com.budgettracker.domain.account.Account;
 import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.account.AccountType;
+import com.budgettracker.domain.importing.ImportBatchRepository;
+import com.budgettracker.domain.transaction.TransactionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class AccountServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private TransactionRepository transactionRepository;
+
+    @Mock
+    private ImportBatchRepository importBatchRepository;
 
     @InjectMocks
     private AccountService accountService;
@@ -95,6 +105,26 @@ class AccountServiceTest {
         when(accountRepository.existsById(99)).thenReturn(false);
 
         assertThatThrownBy(() -> accountService.deleteAccount(99))
+            .isInstanceOf(AccountNotFoundException.class);
+    }
+
+    @Test
+    void deletesAccountWithTransactionsAndImportBatches() {
+        when(accountRepository.existsById(1)).thenReturn(true);
+
+        accountService.deleteAccountWithTransactions(1);
+
+        InOrder inOrder = Mockito.inOrder(transactionRepository, importBatchRepository, accountRepository);
+        inOrder.verify(transactionRepository).deleteByAccountId(1);
+        inOrder.verify(importBatchRepository).deleteByAccountId(1);
+        inOrder.verify(accountRepository).deleteById(1);
+    }
+
+    @Test
+    void throwsWhenNukingMissingAccount() {
+        when(accountRepository.existsById(99)).thenReturn(false);
+
+        assertThatThrownBy(() -> accountService.deleteAccountWithTransactions(99))
             .isInstanceOf(AccountNotFoundException.class);
     }
 }

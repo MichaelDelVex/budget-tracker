@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 
-export type RouteKey = 'dashboard' | 'transactions' | 'import' | 'categories-tags' | 'rules' | 'property-report';
+export type RouteKey = 'dashboard' | 'accounts' | 'transactions' | 'import' | 'categories-tags' | 'rules' | 'property-report';
 
 const navItems: Array<{ route: RouteKey; label: string }> = [
   { route: 'dashboard', label: 'Dashboard' },
+  { route: 'accounts', label: 'Accounts' },
   { route: 'transactions', label: 'Transactions' },
   { route: 'import', label: 'Import' },
   { route: 'categories-tags', label: 'Categories & Tags' },

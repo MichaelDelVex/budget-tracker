@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppLayout, type RouteKey } from './components/AppLayout';
+import { AccountsPage } from './pages/AccountsPage';
 import { CategoriesTagsPage } from './pages/CategoriesTagsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
@@ -9,6 +10,7 @@ import { TransactionsPage } from './pages/TransactionsPage';
 
 const routes = new Set<RouteKey>([
   'dashboard',
+  'accounts',
   'transactions',
   'import',
   'categories-tags',
@@ -35,6 +37,7 @@ function App() {
   return (
     <AppLayout activeRoute={route} onNavigate={navigate}>
       {route === 'dashboard' ? <DashboardPage /> : null}
+      {route === 'accounts' ? <AccountsPage /> : null}
       {route === 'transactions' ? <TransactionsPage /> : null}
       {route === 'import' ? <ImportPage /> : null}
       {route === 'categories-tags' ? <CategoriesTagsPage /> : null}

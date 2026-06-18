@@ -108,6 +108,20 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Delete Account With Transactions",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Destructive: permanently deletes the account, its transactions, and its import batches. Back up the local SQLite database before using.",
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{accountId}}/with-transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accounts", "{{accountId}}", "with-transactions"]
+            }
+          },
+          "response": []
         }
       ]
     },

@@ -1,6 +1,7 @@
 import { request } from './client';
 import type {
   Account,
+  AccountType,
   CategorisationRule,
   Category,
   CategoryType,
@@ -15,6 +16,12 @@ import type {
   Transaction,
   TransactionFilters,
 } from '../types/api';
+
+export interface AccountPayload {
+  name: string;
+  bank: string;
+  accountType: AccountType;
+}
 
 export interface CategoryPayload {
   name: string;
@@ -39,6 +46,22 @@ export interface RulePayload {
 
 export function getAccounts() {
   return request<Account[]>('/api/accounts');
+}
+
+export function createAccount(payload: AccountPayload) {
+  return request<Account>('/api/accounts', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateAccount(id: number, payload: AccountPayload) {
+  return request<Account>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function deleteAccount(id: number) {
+  return request<void>(`/api/accounts/${id}`, { method: 'DELETE' });
+}
+
+export function deleteAccountWithTransactions(id: number) {
+  return request<void>(`/api/accounts/${id}/with-transactions`, { method: 'DELETE' });
 }
 
 export function getCategories() {

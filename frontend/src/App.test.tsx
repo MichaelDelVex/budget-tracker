@@ -80,6 +80,7 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -147,6 +148,91 @@ describe('App', () => {
       expect(calls.some((url) => url.includes('/api/transactions') && url.includes('page=1'))).toBe(true);
     });
     expect(await screen.findByText(/showing 51-75 of 75 transactions/i)).toBeInTheDocument();
+  });
+
+  it('renders account management and creates an account', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    expect(await screen.findByRole('heading', { name: /^accounts$/i })).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/account name/i), 'Holiday');
+    await user.type(screen.getByLabelText(/bank name/i), 'NAB');
+    await user.selectOptions(screen.getByLabelText(/account type/i), 'SAVINGS');
+    await user.click(screen.getByRole('button', { name: /add account/i }));
+
+    await waitFor(() => {
+      expect(fetchCalls().some((url) => url.toString() === '/api/accounts')).toBe(true);
+      expect(vi.mocked(fetch).mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
+    });
+  });
+
+  it('does not delete account when confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    await screen.findByText('Everyday');
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    expect(confirm).toHaveBeenCalled();
+    expect(deleteCalls('/api/accounts/1')).toHaveLength(0);
+  });
+
+  it('calls safe account delete when confirmation is accepted', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    await screen.findByText('Everyday');
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    await waitFor(() => {
+      expect(deleteCalls('/api/accounts/1')).toHaveLength(1);
+    });
+  });
+
+  it('shows account delete errors when account still has transactions', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.stubGlobal('fetch', vi.fn(mockAccountDeleteFailureFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    await screen.findByText('Everyday');
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    expect(await screen.findByText(/still referenced/i)).toBeInTheDocument();
+    expect(screen.getByText('Everyday')).toBeInTheDocument();
+  });
+
+  it('does not nuke account when typed name does not match', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'prompt').mockReturnValue('Wrong name');
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    await screen.findByText('Everyday');
+    await user.click(screen.getByRole('button', { name: /delete with transactions/i }));
+
+    expect(await screen.findByText(/typed account name did not match/i)).toBeInTheDocument();
+    expect(deleteCalls('/api/accounts/1/with-transactions')).toHaveLength(0);
+  });
+
+  it('nukes account when typed name matches', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'prompt').mockReturnValue('Everyday');
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    await screen.findByText('Everyday');
+    await user.click(screen.getByRole('button', { name: /delete with transactions/i }));
+
+    await waitFor(() => {
+      expect(deleteCalls('/api/accounts/1/with-transactions')).toHaveLength(1);
+    });
   });
 
   it('validates missing account and file on import form', async () => {
@@ -354,9 +440,15 @@ describe('App', () => {
   });
 });
 
-async function mockFetch(input: RequestInfo | URL) {
+async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
   const url = input.toString();
   if (url.startsWith('/api/accounts')) {
+    if (options?.method === 'POST' || options?.method === 'PUT') {
+      return json({ id: 2, name: 'Holiday', bank: 'NAB', accountType: 'SAVINGS', createdAt: '', updatedAt: '' });
+    }
+    if (options?.method === 'DELETE') {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
     return json(accounts);
   }
   if (url.startsWith('/api/categories')) {
@@ -485,6 +577,21 @@ async function mockDeleteFailureFetch(input: RequestInfo | URL, options?: Reques
   if (url.startsWith('/api/categories/2') && options?.method === 'DELETE') {
     return Promise.resolve(new Response(JSON.stringify({
       message: 'Category is still used by transactions.',
+      fields: {},
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+async function mockAccountDeleteFailureFetch(input: RequestInfo | URL, options?: RequestInit) {
+  const url = input.toString();
+  if (url.startsWith('/api/accounts/1') && options?.method === 'DELETE') {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'Cannot delete or update this resource because it is still referenced.',
       fields: {},
     }), {
       status: 409,

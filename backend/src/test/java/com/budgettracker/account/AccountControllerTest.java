@@ -133,6 +133,22 @@ class AccountControllerTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void deletesAccountWithTransactions() throws Exception {
+        doNothing().when(accountService).deleteAccountWithTransactions(1);
+
+        mockMvc.perform(delete("/api/accounts/1/with-transactions"))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void returnsNotFoundWhenNukingMissingAccount() throws Exception {
+        doThrow(new AccountNotFoundException(99)).when(accountService).deleteAccountWithTransactions(99);
+
+        mockMvc.perform(delete("/api/accounts/99/with-transactions"))
+            .andExpect(status().isNotFound());
+    }
+
     private static AccountResponse response() {
         Instant now = Instant.parse("2026-06-15T00:00:00Z");
         return new AccountResponse(1, "Everyday", "Example Bank", AccountType.CHECKING, now, now);

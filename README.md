@@ -182,7 +182,10 @@ GET /api/accounts/{id}
 POST /api/accounts
 PUT /api/accounts/{id}
 DELETE /api/accounts/{id}
+DELETE /api/accounts/{id}/with-transactions
 ```
+
+`DELETE /api/accounts/{id}` is the safe delete path and will fail if the account is still referenced. `DELETE /api/accounts/{id}/with-transactions` permanently deletes the account, its transactions, and its import batches. Back up the SQLite database before using the destructive delete endpoint.
 
 Transactions:
 

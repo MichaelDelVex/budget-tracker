@@ -54,4 +54,10 @@ public class AccountController {
         accountService.deleteAccount(id);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{id}/with-transactions")
+    public ResponseEntity<Void> deleteAccountWithTransactions(@PathVariable Integer id) {
+        accountService.deleteAccountWithTransactions(id);
+        return ResponseEntity.noContent().build();
+    }
 }

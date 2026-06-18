@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 public interface TransactionRepository
     extends JpaRepository<Transaction, Integer>, JpaSpecificationExecutor<Transaction> {
 
+    void deleteByAccountId(Integer accountId);
+
     boolean existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
         Integer accountId,
         LocalDate transactionDate,
