@@ -102,6 +102,26 @@ export function CategoriesTagsPage() {
     }
   }
 
+  function confirmDelete(label: string) {
+    return window.confirm(`Delete ${label}? This cannot be undone.`);
+  }
+
+  function deleteCategoryWithConfirmation(category: Category) {
+    if (!confirmDelete(category.name)) {
+      return;
+    }
+
+    deleteCategory(category.id).then(refresh).catch((exception: Error) => setError(exception.message));
+  }
+
+  function deleteTagWithConfirmation(tag: Tag) {
+    if (!confirmDelete(tag.name)) {
+      return;
+    }
+
+    deleteTag(tag.id).then(refresh).catch((exception: Error) => setError(exception.message));
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -123,7 +143,7 @@ export function CategoriesTagsPage() {
             <button type="submit">{editingCategoryId ? 'Save category' : 'Add category'}</button>
           </form>
           {!loading && categories.length === 0 ? <EmptyState title="No categories" detail="Add a category to classify transactions." /> : null}
-          <div className="item-list">{categories.map((category) => <article key={category.id}><span><strong>{category.name}</strong><small>{category.type} - sort {category.sortOrder}</small></span><div><button type="button" onClick={() => { setEditingCategoryId(category.id); setCategoryForm(category); }}>Edit</button><button type="button" onClick={() => deleteCategory(category.id).then(refresh).catch((exception: Error) => setError(exception.message))}>Delete</button></div></article>)}</div>
+          <div className="item-list">{categories.map((category) => <article key={category.id}><span><strong>{category.name}</strong><small>{category.type} - sort {category.sortOrder}</small></span><div><button type="button" onClick={() => { setEditingCategoryId(category.id); setCategoryForm(category); }}>Edit</button><button type="button" onClick={() => deleteCategoryWithConfirmation(category)}>Delete</button></div></article>)}</div>
         </section>
         <section className="work-panel">
           <h3>Tags</h3>
@@ -133,7 +153,7 @@ export function CategoriesTagsPage() {
             <button type="submit">{editingTagId ? 'Save tag' : 'Add tag'}</button>
           </form>
           {!loading && tags.length === 0 ? <EmptyState title="No tags" detail="Add a tag for optional transaction labels." /> : null}
-          <div className="item-list">{tags.map((tag) => <article key={tag.id}><span><i style={{ backgroundColor: tag.color }} /> <strong>{tag.name}</strong><small>{tag.color}</small></span><div><button type="button" onClick={() => { setEditingTagId(tag.id); setTagForm(tag); }}>Edit</button><button type="button" onClick={() => deleteTag(tag.id).then(refresh).catch((exception: Error) => setError(exception.message))}>Delete</button></div></article>)}</div>
+          <div className="item-list">{tags.map((tag) => <article key={tag.id}><span><i style={{ backgroundColor: tag.color }} /> <strong>{tag.name}</strong><small>{tag.color}</small></span><div><button type="button" onClick={() => { setEditingTagId(tag.id); setTagForm(tag); }}>Edit</button><button type="button" onClick={() => deleteTagWithConfirmation(tag)}>Delete</button></div></article>)}</div>
         </section>
       </div>
     </section>

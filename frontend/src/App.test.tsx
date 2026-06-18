@@ -223,6 +223,7 @@ describe('App', () => {
 
   it('shows delete errors and keeps the item visible when deletion fails', async () => {
     const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(mockDeleteFailureFetch));
     render(<App />);
 
@@ -232,6 +233,61 @@ describe('App', () => {
 
     expect(await screen.findByText(/category is still used by transactions/i)).toBeInTheDocument();
     expect(screen.getByText('Dining')).toBeInTheDocument();
+  });
+
+  it('does not call delete API when category delete confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /categories & tags/i }));
+    await screen.findByText('Dining');
+    await user.click(screen.getAllByRole('button', { name: /^delete$/i })[0]);
+
+    expect(confirm).toHaveBeenCalledWith('Delete Dining? This cannot be undone.');
+    expect(deleteCalls('/api/categories/2')).toHaveLength(0);
+  });
+
+  it('calls delete API when category delete confirmation is accepted', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /categories & tags/i }));
+    await screen.findByText('Dining');
+    await user.click(screen.getAllByRole('button', { name: /^delete$/i })[0]);
+
+    await waitFor(() => {
+      expect(deleteCalls('/api/categories/2')).toHaveLength(1);
+    });
+  });
+
+  it('confirms tag deletion before calling delete API', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /categories & tags/i }));
+    await screen.findByText('Tax');
+    await user.click(screen.getAllByRole('button', { name: /^delete$/i })[2]);
+
+    await waitFor(() => {
+      expect(deleteCalls('/api/tags/3')).toHaveLength(1);
+    });
+  });
+
+  it('confirms rule deletion before calling delete API', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^rules$/i }));
+    await screen.findByText('coffee');
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    await waitFor(() => {
+      expect(deleteCalls('/api/categorisation-rules/4')).toHaveLength(1);
+    });
   });
 
   it('shows a dashboard error state when report requests fail', async () => {
@@ -471,4 +527,10 @@ function json(body: unknown) {
 
 function fetchCalls() {
   return vi.mocked(fetch).mock.calls.map(([url]) => url);
+}
+
+function deleteCalls(path: string) {
+  return vi.mocked(fetch).mock.calls.filter(([url, options]) => (
+    url.toString().startsWith(path) && options?.method === 'DELETE'
+  ));
 }

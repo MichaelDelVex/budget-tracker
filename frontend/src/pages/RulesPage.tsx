@@ -80,6 +80,14 @@ export function RulesPage() {
     }).then(refresh).catch((exception: Error) => setError(exception.message));
   }
 
+  function deleteRuleWithConfirmation(rule: CategorisationRule) {
+    if (!window.confirm(`Delete rule "${rule.matchText}"? This cannot be undone.`)) {
+      return;
+    }
+
+    deleteRule(rule.id).then(refresh).catch((exception: Error) => setError(exception.message));
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -109,7 +117,7 @@ export function RulesPage() {
             <div>
               <button type="button" onClick={() => toggleRule(rule)}>{rule.active ? 'Deactivate' : 'Activate'}</button>
               <button type="button" onClick={() => { setEditingId(rule.id); setForm({ matchText: rule.matchText, categoryId: rule.categoryId, tagId: rule.tagId, active: rule.active, priority: rule.priority }); }}>Edit</button>
-              <button type="button" onClick={() => deleteRule(rule.id).then(refresh).catch((exception: Error) => setError(exception.message))}>Delete</button>
+              <button type="button" onClick={() => deleteRuleWithConfirmation(rule)}>Delete</button>
             </div>
           </article>
         ))}
