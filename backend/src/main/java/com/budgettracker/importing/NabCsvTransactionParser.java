@@ -96,12 +96,14 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
             throw new IllegalArgumentException("Description is required");
         }
 
+        String csvCategory = firstPresent(values, columns, "category");
         NormalisedAmount amount = parseAmount(values, columns);
         return new ParsedTransactionRow(
             rowNumber,
             transactionDate,
             description.trim(),
             description,
+            csvCategory == null ? null : csvCategory.trim(),
             amount.amount(),
             amount.direction()
         );

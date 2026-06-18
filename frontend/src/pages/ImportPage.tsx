@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { ApiError } from '../api/client';
-import { getAccounts, importTransactions } from '../api/budgetApi';
+import { createCategory, getAccounts, importTransactions } from '../api/budgetApi';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { LoadingState } from '../components/LoadingState';
-import type { Account, ImportDuplicateTransaction, ImportSummary } from '../types/api';
+import type { Account, ImportDuplicateTransaction, ImportSummary, UnmatchedImportCategory } from '../types/api';
 
 export function ImportPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -14,6 +14,7 @@ export function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const duplicates = summary?.duplicates ?? [];
+  const unmatchedCategories = summary?.unmatchedCategories ?? [];
 
   useEffect(() => {
     getAccounts().then(setAccounts).catch((exception: Error) => setError(exception.message));
@@ -55,6 +56,25 @@ export function ImportPage() {
     }
   }
 
+  async function addCategory(category: UnmatchedImportCategory) {
+    try {
+      await createCategory({
+        name: category.name,
+        type: category.type,
+        defaultCategory: false,
+        active: true,
+        sortOrder: 500,
+      });
+      setSummary((current) => current ? {
+        ...current,
+        unmatchedCategories: current.unmatchedCategories.filter((item) => item.name !== category.name || item.type !== category.type),
+      } : current);
+      setError(null);
+    } catch (exception) {
+      setError((exception as Error).message);
+    }
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -83,6 +103,20 @@ export function ImportPage() {
             <ul className="error-list">
               {summary.errors.map((item) => <li key={`${item.rowNumber}-${item.message}`}>Row {item.rowNumber}: {item.message}</li>)}
             </ul>
+          ) : null}
+          {unmatchedCategories.length > 0 ? (
+            <section className="duplicate-review" aria-label="Unmatched CSV categories">
+              <h4>New CSV categories found</h4>
+              <p className="status-text">Add these as app categories if you want future imports to assign them automatically.</p>
+              <ul className="review-list">
+                {unmatchedCategories.map((category) => (
+                  <li key={`${category.type}-${category.name}`}>
+                    <span>{category.name} ({category.type.toLowerCase()}, {category.rowCount} rows)</span>
+                    <button type="button" onClick={() => addCategory(category)}>Add category</button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
           {duplicates.length > 0 ? (
             <section className="duplicate-review" aria-label="Duplicate transactions">

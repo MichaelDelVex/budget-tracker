@@ -13,6 +13,9 @@ import static org.mockito.Mockito.when;
 
 import com.budgettracker.account.AccountNotFoundException;
 import com.budgettracker.domain.account.AccountRepository;
+import com.budgettracker.domain.category.Category;
+import com.budgettracker.domain.category.CategoryRepository;
+import com.budgettracker.domain.category.CategoryType;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
@@ -41,6 +44,9 @@ class TransactionImportServiceTest {
     private AccountRepository accountRepository;
 
     @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
     private ImportBatchRepository importBatchRepository;
 
     @Mock
@@ -65,6 +71,7 @@ class TransactionImportServiceTest {
             LocalDate.of(2026, 1, 10),
             "Coffee",
             "Coffee",
+            null,
             new BigDecimal("4.50"),
             TransactionDirection.EXPENSE
         );
@@ -109,6 +116,82 @@ class TransactionImportServiceTest {
             eq("EXPENSE"),
             eq(2),
             eq(3),
+            eq(7)
+        );
+    }
+
+    @Test
+    void appliesMatchingCsvCategoryBeforeRules() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = rowWithCsvCategory(
+            LocalDate.of(2026, 1, 10),
+            "Hospital parking",
+            "Parking & tolls",
+            "8.00"
+        );
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(categoryRepository.findAllByOrderBySortOrderAscNameAsc()).thenReturn(List.of(category(12, "Parking & tolls", CategoryType.EXPENSE)));
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+        when(categorisationRuleMatcher.loadSnapshot()).thenReturn(new CategorisationRuleSnapshot(
+            List.of(new CategorisationRuleSnapshot.RuleMatch("Hospital", 99, null)),
+            null
+        ));
+
+        ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(response.unmatchedCategories()).isEmpty();
+        verify(jdbcTemplate).update(
+            any(String.class),
+            eq(1),
+            eq("2026-01-10"),
+            eq("Hospital parking"),
+            eq("Hospital parking"),
+            eq(new BigDecimal("8.00")),
+            eq("EXPENSE"),
+            eq(12),
+            eq(null),
+            eq(7)
+        );
+    }
+
+    @Test
+    void reportsUnknownCsvCategoriesAndFallsBackToRules() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = rowWithCsvCategory(
+            LocalDate.of(2026, 1, 10),
+            "Hospital parking",
+            "Parking & tolls",
+            "8.00"
+        );
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(categoryRepository.findAllByOrderBySortOrderAscNameAsc()).thenReturn(List.of());
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+        when(categorisationRuleMatcher.loadSnapshot()).thenReturn(new CategorisationRuleSnapshot(
+            List.of(new CategorisationRuleSnapshot.RuleMatch("Hospital", 5, null)),
+            null
+        ));
+
+        ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(response.unmatchedCategories()).containsExactly(new UnmatchedImportCategoryResponse(
+            "Parking & tolls",
+            CategoryType.EXPENSE,
+            1
+        ));
+        verify(jdbcTemplate).update(
+            any(String.class),
+            eq(1),
+            eq("2026-01-10"),
+            eq("Hospital parking"),
+            eq("Hospital parking"),
+            eq(new BigDecimal("8.00")),
+            eq("EXPENSE"),
+            eq(5),
+            eq(null),
             eq(7)
         );
     }
@@ -199,6 +282,7 @@ class TransactionImportServiceTest {
             LocalDate.of(2026, 1, 10),
             "Coffee",
             "Coffee",
+            null,
             new BigDecimal("4.500"),
             TransactionDirection.EXPENSE
         );
@@ -225,6 +309,7 @@ class TransactionImportServiceTest {
             LocalDate.of(2026, 1, 10),
             "  Coffee   Shop  ",
             "  Coffee   Shop  ",
+            null,
             new BigDecimal("4.50"),
             TransactionDirection.EXPENSE
         );
@@ -388,6 +473,7 @@ class TransactionImportServiceTest {
     private TransactionImportService service() {
         TransactionImportService service = new TransactionImportService(
             accountRepository,
+            categoryRepository,
             importBatchRepository,
             transactionRepository,
             categorisationRuleMatcher,
@@ -396,6 +482,7 @@ class TransactionImportServiceTest {
         );
         lenient().when(categorisationRuleMatcher.loadSnapshot())
             .thenReturn(new CategorisationRuleSnapshot(List.of(), null));
+        lenient().when(categoryRepository.findAllByOrderBySortOrderAscNameAsc()).thenReturn(List.of());
         return service;
     }
 
@@ -405,9 +492,28 @@ class TransactionImportServiceTest {
             date,
             description,
             description,
+            null,
             new BigDecimal(amount),
             TransactionDirection.EXPENSE
         );
+    }
+
+    private ParsedTransactionRow rowWithCsvCategory(LocalDate date, String description, String csvCategory, String amount) {
+        return new ParsedTransactionRow(
+            2,
+            date,
+            description,
+            description,
+            csvCategory,
+            new BigDecimal(amount),
+            TransactionDirection.EXPENSE
+        );
+    }
+
+    private Category category(Integer id, String name, CategoryType type) {
+        Category category = new Category(name, type, true, 100);
+        ReflectionTestUtils.setField(category, "id", id);
+        return category;
     }
 
     private TransactionDuplicateMatchView duplicateMatch(

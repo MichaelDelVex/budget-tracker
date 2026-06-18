@@ -72,6 +72,7 @@ export interface TransactionFilters {
   tagId?: string;
   direction?: '' | TransactionDirection;
   search?: string;
+  uncategorisedOnly?: boolean;
 }
 
 export interface ImportRowError {
@@ -93,6 +94,12 @@ export interface ImportDuplicate {
   matchedTransaction: ImportDuplicateTransaction;
 }
 
+export interface UnmatchedImportCategory {
+  name: string;
+  type: CategoryType;
+  rowCount: number;
+}
+
 export interface ImportSummary {
   totalRows: number;
   importedCount: number;
@@ -100,6 +107,7 @@ export interface ImportSummary {
   failedCount: number;
   errors: ImportRowError[];
   duplicates: ImportDuplicate[];
+  unmatchedCategories: UnmatchedImportCategory[];
 }
 
 export type ReportGroupBy = 'FORTNIGHT' | 'MONTH' | 'QUARTER' | 'YEAR';

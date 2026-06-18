@@ -2,6 +2,9 @@ package com.budgettracker.importing;
 
 import com.budgettracker.account.AccountNotFoundException;
 import com.budgettracker.domain.account.AccountRepository;
+import com.budgettracker.domain.category.Category;
+import com.budgettracker.domain.category.CategoryRepository;
+import com.budgettracker.domain.category.CategoryType;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
@@ -18,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,6 +38,7 @@ public class TransactionImportService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TransactionImportService.class);
 
     private final AccountRepository accountRepository;
+    private final CategoryRepository categoryRepository;
     private final ImportBatchRepository importBatchRepository;
     private final TransactionRepository transactionRepository;
     private final CategorisationRuleMatcher categorisationRuleMatcher;
@@ -41,6 +47,7 @@ public class TransactionImportService {
 
     public TransactionImportService(
         AccountRepository accountRepository,
+        CategoryRepository categoryRepository,
         ImportBatchRepository importBatchRepository,
         TransactionRepository transactionRepository,
         CategorisationRuleMatcher categorisationRuleMatcher,
@@ -48,6 +55,7 @@ public class TransactionImportService {
         JdbcTemplate jdbcTemplate
     ) {
         this.accountRepository = accountRepository;
+        this.categoryRepository = categoryRepository;
         this.importBatchRepository = importBatchRepository;
         this.transactionRepository = transactionRepository;
         this.categorisationRuleMatcher = categorisationRuleMatcher;
@@ -84,6 +92,7 @@ public class TransactionImportService {
         ParsedTransactionFile parsedFile
     ) {
         ImportCandidateSelection candidates = selectImportCandidates(accountId, parsedFile.rows());
+        CsvCategorySelection csvCategories = selectCsvCategories(parsedFile.rows());
 
         ImportBatch importBatch = importBatchRepository.saveAndFlush(new ImportBatch(
             accountId,
@@ -95,7 +104,12 @@ public class TransactionImportService {
             Instant.now()
         ));
 
-        ImportInsertResult insertResult = insertTransactions(accountId, importBatch.getId(), candidates.importableRows());
+        ImportInsertResult insertResult = insertTransactions(
+            accountId,
+            importBatch.getId(),
+            candidates.importableRows(),
+            csvCategories.categoryIdsByRowNumber()
+        );
         int duplicateCount = candidates.duplicateCount() + insertResult.duplicateCount();
         importBatch.updateCounts(insertResult.importedCount(), duplicateCount, parsedFile.errors().size());
 
@@ -105,7 +119,8 @@ public class TransactionImportService {
             duplicateCount,
             parsedFile.errors().size(),
             parsedFile.errors(),
-            candidates.duplicates()
+            candidates.duplicates(),
+            csvCategories.unmatchedCategories()
         );
         logImportSummary(accountId, originalFilename, response);
         return response;
@@ -115,10 +130,14 @@ public class TransactionImportService {
         Integer accountId,
         Integer importBatchId,
         ParsedTransactionRow row,
-        CategorisationRuleSnapshot ruleSnapshot
+        CategorisationRuleSnapshot ruleSnapshot,
+        Map<Integer, Integer> csvCategoryIdsByRowNumber
     ) {
         String description = normaliseDescription(row.description());
-        MatchedCategorisation categorisation = ruleSnapshot.match(description);
+        Integer csvCategoryId = csvCategoryIdsByRowNumber.get(row.rowNumber());
+        MatchedCategorisation categorisation = csvCategoryId == null
+            ? ruleSnapshot.match(description)
+            : new MatchedCategorisation(csvCategoryId, null);
         return new Transaction(
             accountId,
             row.transactionDate(),
@@ -204,7 +223,8 @@ public class TransactionImportService {
     private ImportInsertResult insertTransactions(
         Integer accountId,
         Integer importBatchId,
-        List<ParsedTransactionRow> rows
+        List<ParsedTransactionRow> rows,
+        Map<Integer, Integer> csvCategoryIdsByRowNumber
     ) {
         int importedCount = 0;
         int duplicateCount = 0;
@@ -212,7 +232,7 @@ public class TransactionImportService {
 
         for (ParsedTransactionRow row : rows) {
             try {
-                insertTransaction(toTransaction(accountId, importBatchId, row, ruleSnapshot));
+                insertTransaction(toTransaction(accountId, importBatchId, row, ruleSnapshot, csvCategoryIdsByRowNumber));
                 importedCount++;
             } catch (DataIntegrityViolationException exception) {
                 if (!isDuplicateConstraintViolation(exception)) {
@@ -288,6 +308,7 @@ public class TransactionImportService {
             duplicateCount,
             errors.size(),
             errors,
+            List.of(),
             List.of()
         );
         logImportSummary(accountId, originalFilename, response);
@@ -339,6 +360,52 @@ public class TransactionImportService {
         return description.trim().replaceAll("\\s+", " ");
     }
 
+    private CsvCategorySelection selectCsvCategories(List<ParsedTransactionRow> rows) {
+        Map<CategoryKey, Integer> categoriesByNameAndType = new HashMap<>();
+        for (Category category : categoryRepository.findAllByOrderBySortOrderAscNameAsc()) {
+            if (category.isActive()) {
+                categoriesByNameAndType.put(CategoryKey.from(category.getName(), category.getType()), category.getId());
+            }
+        }
+
+        Map<Integer, Integer> categoryIdsByRowNumber = new HashMap<>();
+        Map<CategoryKey, Integer> unmatchedCategoryCounts = new TreeMap<>((left, right) -> {
+            int nameComparison = String.CASE_INSENSITIVE_ORDER.compare(left.name(), right.name());
+            return nameComparison != 0 ? nameComparison : left.type().compareTo(right.type());
+        });
+        Map<CategoryKey, String> unmatchedCategoryDisplayNames = new HashMap<>();
+        for (ParsedTransactionRow row : rows) {
+            if (row.csvCategory() == null || row.csvCategory().isBlank()) {
+                continue;
+            }
+
+            CategoryType type = categoryType(row.direction());
+            Integer categoryId = categoriesByNameAndType.get(CategoryKey.from(row.csvCategory(), type));
+            if (categoryId == null) {
+                CategoryKey key = CategoryKey.from(row.csvCategory(), type);
+                unmatchedCategoryDisplayNames.putIfAbsent(key, row.csvCategory().trim());
+                unmatchedCategoryCounts.merge(key, 1, Integer::sum);
+            } else {
+                categoryIdsByRowNumber.put(row.rowNumber(), categoryId);
+            }
+        }
+
+        return new CsvCategorySelection(
+            categoryIdsByRowNumber,
+            unmatchedCategoryCounts.entrySet().stream()
+                .map(entry -> new UnmatchedImportCategoryResponse(
+                    unmatchedCategoryDisplayNames.get(entry.getKey()),
+                    entry.getKey().type(),
+                    entry.getValue()
+                ))
+                .toList()
+        );
+    }
+
+    private CategoryType categoryType(TransactionDirection direction) {
+        return direction == TransactionDirection.INCOME ? CategoryType.INCOME : CategoryType.EXPENSE;
+    }
+
     private ImportDuplicateTransactionResponse duplicateResponse(
         Integer id,
         Integer rowNumber,
@@ -377,6 +444,19 @@ public class TransactionImportService {
     }
 
     private record ImportInsertResult(int importedCount, int duplicateCount) {
+    }
+
+    private record CsvCategorySelection(
+        Map<Integer, Integer> categoryIdsByRowNumber,
+        List<UnmatchedImportCategoryResponse> unmatchedCategories
+    ) {
+    }
+
+    private record CategoryKey(String name, CategoryType type) {
+
+        static CategoryKey from(String name, CategoryType type) {
+            return new CategoryKey(name.trim().toLowerCase(Locale.ROOT), type);
+        }
     }
 
     private record DuplicateKey(

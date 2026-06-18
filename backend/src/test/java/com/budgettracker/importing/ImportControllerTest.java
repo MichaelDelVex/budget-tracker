@@ -39,6 +39,7 @@ class ImportControllerTest {
             0,
             0,
             List.of(),
+            List.of(),
             List.of()
         ));
 
@@ -50,7 +51,8 @@ class ImportControllerTest {
             .andExpect(jsonPath("$.importedCount").value(1))
             .andExpect(jsonPath("$.duplicateCount").value(0))
             .andExpect(jsonPath("$.failedCount").value(0))
-            .andExpect(jsonPath("$.duplicates").isArray());
+            .andExpect(jsonPath("$.duplicates").isArray())
+            .andExpect(jsonPath("$.unmatchedCategories").isArray());
     }
 
     @Test

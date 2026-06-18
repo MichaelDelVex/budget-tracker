@@ -126,7 +126,7 @@ export function getTransactions(filters: TransactionFilters = {}, page = 0, size
   });
   Object.entries(filters).forEach(([key, value]) => {
     if (value) {
-      params.set(key, value);
+      params.set(key, String(value));
     }
   });
   return request<PagedResponse<Transaction>>(`/api/transactions?${params.toString()}`);

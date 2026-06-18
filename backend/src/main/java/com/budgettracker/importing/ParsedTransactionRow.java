@@ -9,6 +9,7 @@ public record ParsedTransactionRow(
     LocalDate transactionDate,
     String description,
     String rawDescription,
+    String csvCategory,
     BigDecimal amount,
     TransactionDirection direction
 ) {

@@ -8,6 +8,7 @@ public record ImportSummaryResponse(
     int duplicateCount,
     int failedCount,
     List<ImportRowError> errors,
-    List<ImportDuplicateResponse> duplicates
+    List<ImportDuplicateResponse> duplicates,
+    List<UnmatchedImportCategoryResponse> unmatchedCategories
 ) {
 }

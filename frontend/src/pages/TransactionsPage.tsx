@@ -13,6 +13,7 @@ export function TransactionsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filters, setFilters] = useState<TransactionFilters>({});
+  const [view, setView] = useState<'all' | 'uncategorised'>('all');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [totalElements, setTotalElements] = useState(0);
@@ -63,6 +64,16 @@ export function TransactionsPage() {
     setPage(0);
   }
 
+  function changeView(nextView: 'all' | 'uncategorised') {
+    setView(nextView);
+    setFilters((current) => ({
+      ...current,
+      categoryId: nextView === 'uncategorised' ? undefined : current.categoryId,
+      uncategorisedOnly: nextView === 'uncategorised' ? true : undefined,
+    }));
+    setPage(0);
+  }
+
   function changePageSize(value: string) {
     setPageSize(Number(value));
     setPage(0);
@@ -105,6 +116,14 @@ export function TransactionsPage() {
         <label>Tag<select onChange={(event) => setFilter('tagId', event.target.value)}><option value="">All</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
         <label>Direction<select onChange={(event) => setFilter('direction', event.target.value)}><option value="">All</option><option value="INCOME">Income</option><option value="EXPENSE">Expense</option></select></label>
         <label className="wide-field">Search<input placeholder="Description" onChange={(event) => setFilter('search', event.target.value)} /></label>
+      </div>
+      <div className="tab-bar" aria-label="Transaction views">
+        <button className={view === 'all' ? 'active' : ''} type="button" onClick={() => changeView('all')}>
+          All transactions
+        </button>
+        <button className={view === 'uncategorised' ? 'active' : ''} type="button" onClick={() => changeView('uncategorised')}>
+          Uncategorised
+        </button>
       </div>
       <div className="pagination-bar" aria-label="Transaction pagination">
         <p>

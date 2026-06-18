@@ -11,6 +11,7 @@ public record TransactionFilterRequest(
     Integer categoryId,
     Integer tagId,
     TransactionDirection direction,
-    String search
+    String search,
+    Boolean uncategorisedOnly
 ) {
 }

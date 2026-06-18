@@ -51,7 +51,8 @@ class TransactionControllerTest {
                 2,
                 3,
                 TransactionDirection.EXPENSE,
-                "coffee"
+                "coffee",
+                true
             )),
             org.mockito.ArgumentMatchers.any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(response()), pageable, 1));
@@ -64,6 +65,7 @@ class TransactionControllerTest {
                 .param("tagId", "3")
                 .param("direction", "EXPENSE")
                 .param("search", "coffee")
+                .param("uncategorisedOnly", "true")
                 .param("page", "0")
                 .param("size", "25"))
             .andExpect(status().isOk())

@@ -220,6 +220,19 @@ p {
   gap: 0.45rem;
 }
 
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.tab-bar button.active {
+  border-color: #355f8a;
+  background: #e8f1fb;
+  color: #143d66;
+  font-weight: 800;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -418,6 +431,24 @@ th {
 
 .duplicate-review h4 {
   margin: 0;
+}
+
+.review-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.review-list li {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.review-list li::marker {
+  color: #667789;
 }
 
 .duplicate-review td {

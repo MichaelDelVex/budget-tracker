@@ -7,6 +7,7 @@ import static com.budgettracker.domain.transaction.TransactionSpecifications.sea
 import static com.budgettracker.domain.transaction.TransactionSpecifications.tagIdEquals;
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrAfter;
 import static com.budgettracker.domain.transaction.TransactionSpecifications.transactionDateOnOrBefore;
+import static com.budgettracker.domain.transaction.TransactionSpecifications.uncategorisedOnly;
 
 import com.budgettracker.account.AccountNotFoundException;
 import com.budgettracker.category.CategoryNotFoundException;
@@ -28,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TransactionService {
+
+    private static final String UNCATEGORISED = "Uncategorised";
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
@@ -100,9 +103,20 @@ public class TransactionService {
             .and(transactionDateOnOrBefore(filter.dateTo()))
             .and(accountIdEquals(filter.accountId()))
             .and(categoryIdEquals(filter.categoryId()))
+            .and(uncategorisedOnly(Boolean.TRUE.equals(filter.uncategorisedOnly()), uncategorisedCategoryId(filter)))
             .and(tagIdEquals(filter.tagId()))
             .and(directionEquals(filter.direction()))
             .and(searchDescriptions(filter.search()));
+    }
+
+    private Integer uncategorisedCategoryId(TransactionFilterRequest filter) {
+        if (!Boolean.TRUE.equals(filter.uncategorisedOnly())) {
+            return null;
+        }
+
+        return categoryRepository.findByNameIgnoreCaseAndActiveTrue(UNCATEGORISED)
+            .map(category -> category.getId())
+            .orElse(null);
     }
 
     private void validateReferences(TransactionUpdateRequest request) {

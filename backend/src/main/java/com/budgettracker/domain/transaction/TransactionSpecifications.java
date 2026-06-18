@@ -28,6 +28,23 @@ public final class TransactionSpecifications {
         return equalsIfPresent("categoryId", categoryId);
     }
 
+    public static Specification<Transaction> uncategorisedOnly(boolean enabled, Integer uncategorisedCategoryId) {
+        return (root, query, builder) -> {
+            if (!enabled) {
+                return null;
+            }
+
+            if (uncategorisedCategoryId == null) {
+                return builder.isNull(root.get("categoryId"));
+            }
+
+            return builder.or(
+                builder.isNull(root.get("categoryId")),
+                builder.equal(root.get("categoryId"), uncategorisedCategoryId)
+            );
+        };
+    }
+
     public static Specification<Transaction> tagIdEquals(Integer tagId) {
         return equalsIfPresent("tagId", tagId);
     }

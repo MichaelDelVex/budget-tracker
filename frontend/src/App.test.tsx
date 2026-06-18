@@ -278,6 +278,27 @@ describe('App', () => {
     expect(within(duplicates).getAllByText(/coffee shop/i)).toHaveLength(2);
   });
 
+  it('displays unmatched CSV categories after import', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    const unmatched = await screen.findByLabelText(/unmatched csv categories/i);
+    expect(within(unmatched).getByText(/parking & tolls \(expense, 2 rows\)/i)).toBeInTheDocument();
+    await user.click(within(unmatched).getByRole('button', { name: /add category/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
+        url.toString() === '/api/categories' && options?.method === 'POST'
+      )).toBe(true);
+    });
+  });
+
   it('displays failed import errors from the API', async () => {
     const user = userEvent.setup();
     const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
@@ -321,6 +342,19 @@ describe('App', () => {
     expect(await screen.findByText(/transaction could not be updated/i)).toBeInTheDocument();
     expect(categorySelect).toHaveValue('2');
     expect(screen.queryByText(/updated successfully/i)).not.toBeInTheDocument();
+  });
+
+  it('requests only uncategorised transactions from the transactions sub-view', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /transactions/i }));
+    await screen.findByRole('heading', { name: /^transactions$/i });
+    await user.click(screen.getByRole('button', { name: /^uncategorised$/i }));
+
+    await waitFor(() => {
+      expect(fetchCalls().some((url) => url.toString().includes('uncategorisedOnly=true'))).toBe(true);
+    });
   });
 
   it('shows delete errors and keeps the item visible when deletion fails', async () => {
@@ -498,6 +532,7 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
       duplicateCount: 1,
       failedCount: 0,
       errors: [],
+      unmatchedCategories: [{ name: 'Parking & tolls', type: 'EXPENSE', rowCount: 2 }],
       duplicates: [{
         incoming: {
           id: null,

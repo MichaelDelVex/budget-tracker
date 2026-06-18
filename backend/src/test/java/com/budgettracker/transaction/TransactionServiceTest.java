@@ -67,7 +67,8 @@ class TransactionServiceTest {
             2,
             3,
             TransactionDirection.EXPENSE,
-            "coffee"
+            "coffee",
+            false
         );
 
         assertThat(transactionService.listTransactions(filter, pageable).getContent())

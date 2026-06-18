@@ -138,6 +138,7 @@ class NabCsvTransactionParserTest {
         assertThat(row.transactionDate()).isEqualTo(LocalDate.of(2026, 6, 17));
         assertThat(row.description()).isEqualTo("FrankstonHospitalCarPa Frankston 036");
         assertThat(row.rawDescription()).isEqualTo("FrankstonHospitalCarPa Frankston 036");
+        assertThat(row.csvCategory()).isEqualTo("Parking & tolls");
         assertThat(row.amount()).isEqualByComparingTo(new BigDecimal("8.00"));
         assertThat(row.direction()).isEqualTo(TransactionDirection.EXPENSE);
     }
