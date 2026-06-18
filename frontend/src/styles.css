@@ -410,6 +410,20 @@ th {
   padding: 0.6rem 0.75rem;
 }
 
+.duplicate-review {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.duplicate-review h4 {
+  margin: 0;
+}
+
+.duplicate-review td {
+  min-width: 12rem;
+}
+
 .report-list {
   display: grid;
   gap: 0.7rem;

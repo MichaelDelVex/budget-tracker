@@ -262,6 +262,22 @@ describe('App', () => {
     expect(within(summary).getByText('2')).toBeInTheDocument();
   });
 
+  it('displays duplicate transaction matches after import', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    const duplicates = await screen.findByLabelText(/duplicate transactions/i);
+    expect(within(duplicates).getByText(/row 2/i)).toBeInTheDocument();
+    expect(within(duplicates).getByText(/transaction #5/i)).toBeInTheDocument();
+    expect(within(duplicates).getAllByText(/coffee shop/i)).toHaveLength(2);
+  });
+
   it('displays failed import errors from the API', async () => {
     const user = userEvent.setup();
     const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
@@ -476,7 +492,31 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
     return json(transactions);
   }
   if (url.startsWith('/api/imports/transactions')) {
-    return json({ totalRows: 2, importedCount: 1, duplicateCount: 1, failedCount: 0, errors: [] });
+    return json({
+      totalRows: 2,
+      importedCount: 1,
+      duplicateCount: 1,
+      failedCount: 0,
+      errors: [],
+      duplicates: [{
+        incoming: {
+          id: null,
+          rowNumber: 2,
+          transactionDate: '2026-01-10',
+          description: 'Coffee Shop',
+          amount: 4.5,
+          direction: 'EXPENSE',
+        },
+        matchedTransaction: {
+          id: 5,
+          rowNumber: null,
+          transactionDate: '2026-01-10',
+          description: 'Coffee Shop',
+          amount: 4.5,
+          direction: 'EXPENSE',
+        },
+      }],
+    });
   }
   return json({});
 }

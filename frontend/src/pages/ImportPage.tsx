@@ -3,7 +3,7 @@ import { ApiError } from '../api/client';
 import { getAccounts, importTransactions } from '../api/budgetApi';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { LoadingState } from '../components/LoadingState';
-import type { Account, ImportSummary } from '../types/api';
+import type { Account, ImportDuplicateTransaction, ImportSummary } from '../types/api';
 
 export function ImportPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -13,6 +13,7 @@ export function ImportPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const duplicates = summary?.duplicates ?? [];
 
   useEffect(() => {
     getAccounts().then(setAccounts).catch((exception: Error) => setError(exception.message));
@@ -83,8 +84,47 @@ export function ImportPage() {
               {summary.errors.map((item) => <li key={`${item.rowNumber}-${item.message}`}>Row {item.rowNumber}: {item.message}</li>)}
             </ul>
           ) : null}
+          {duplicates.length > 0 ? (
+            <section className="duplicate-review" aria-label="Duplicate transactions">
+              <h4>Duplicate transactions</h4>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Uploaded row</th>
+                      <th>Uploaded transaction</th>
+                      <th>Matched against</th>
+                      <th>Matched transaction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {duplicates.map((duplicate) => (
+                      <tr key={`${duplicate.incoming.rowNumber}-${duplicate.incoming.transactionDate}-${duplicate.incoming.description}`}>
+                        <td>Row {duplicate.incoming.rowNumber}</td>
+                        <td>{formatDuplicateTransaction(duplicate.incoming)}</td>
+                        <td>{formatMatchSource(duplicate.matchedTransaction)}</td>
+                        <td>{formatDuplicateTransaction(duplicate.matchedTransaction)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
         </section>
       ) : null}
     </section>
   );
+}
+
+function formatMatchSource(transaction: ImportDuplicateTransaction) {
+  if (transaction.id !== null) {
+    return `Transaction #${transaction.id}`;
+  }
+
+  return transaction.rowNumber ? `Earlier upload row ${transaction.rowNumber}` : 'Existing transaction';
+}
+
+function formatDuplicateTransaction(transaction: ImportDuplicateTransaction) {
+  return `${transaction.transactionDate} - ${transaction.description} - ${transaction.direction} $${transaction.amount.toFixed(2)}`;
 }

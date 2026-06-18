@@ -164,7 +164,7 @@ Current CSV support is NAB-style exports. The parser normalises signed CSV amoun
 - `INCOME` and `EXPENSE` are stored as separate directions.
 - `amount` is stored as a positive value.
 
-Duplicate detection currently skips rows with the same account, transaction date, description, and amount. Imports also apply active categorisation rules by priority. If no rule matches, the active `Uncategorised` category is used when available.
+Duplicate detection skips rows with the same account, transaction date, description, and amount. The import summary includes duplicate details so the Import page can show the uploaded row and the existing transaction or earlier CSV row it matched. Imports also apply active categorisation rules by priority. If no rule matches, the active `Uncategorised` category is used when available.
 
 ## API Overview
 

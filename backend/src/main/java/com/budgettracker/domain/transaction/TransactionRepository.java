@@ -30,14 +30,16 @@ public interface TransactionRepository
 
     @Query("""
         select
+            transaction.id as id,
             transaction.transactionDate as transactionDate,
             transaction.description as description,
-            transaction.amount as amount
+            transaction.amount as amount,
+            transaction.direction as direction
         from Transaction transaction
         where transaction.accountId = :accountId
             and transaction.transactionDate between :dateFrom and :dateTo
         """)
-    List<TransactionDuplicateKeyView> findDuplicateKeysForAccountAndDateRange(
+    List<TransactionDuplicateMatchView> findDuplicateMatchesForAccountAndDateRange(
         @Param("accountId") Integer accountId,
         @Param("dateFrom") LocalDate dateFrom,
         @Param("dateTo") LocalDate dateTo

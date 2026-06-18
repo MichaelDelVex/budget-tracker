@@ -7,6 +7,7 @@ public record ImportSummaryResponse(
     int importedCount,
     int duplicateCount,
     int failedCount,
-    List<ImportRowError> errors
+    List<ImportRowError> errors,
+    List<ImportDuplicateResponse> duplicates
 ) {
 }

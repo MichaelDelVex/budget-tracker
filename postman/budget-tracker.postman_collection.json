@@ -724,6 +724,7 @@
           "request": {
             "method": "POST",
             "header": [],
+            "description": "Uploads a bank CSV for an account. The response includes import counts, row errors, and duplicate details showing each skipped uploaded row and the existing transaction or earlier CSV row it matched.",
             "body": {
               "mode": "formdata",
               "formdata": [

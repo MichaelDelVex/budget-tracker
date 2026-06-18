@@ -16,7 +16,7 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
-import com.budgettracker.domain.transaction.TransactionDuplicateKeyView;
+import com.budgettracker.domain.transaction.TransactionDuplicateMatchView;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import java.math.BigDecimal;
@@ -121,16 +121,21 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(transactionRepository.findDuplicateKeysForAccountAndDateRange(
+        when(transactionRepository.findDuplicateMatchesForAccountAndDateRange(
             1,
             row.transactionDate(),
             row.transactionDate()
-        )).thenReturn(List.of(duplicateKey(row.transactionDate(), row.description(), row.amount())));
+        )).thenReturn(List.of(duplicateMatch(42, row.transactionDate(), row.description(), row.amount(), row.direction())));
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
         assertThat(response.importedCount()).isZero();
         assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.duplicates()).hasSize(1);
+        assertThat(response.duplicates().getFirst().incoming().rowNumber()).isEqualTo(2);
+        assertThat(response.duplicates().getFirst().incoming().description()).isEqualTo("Coffee");
+        assertThat(response.duplicates().getFirst().matchedTransaction().id()).isEqualTo(42);
+        assertThat(response.duplicates().getFirst().matchedTransaction().rowNumber()).isNull();
         verify(jdbcTemplate, never()).update(any(String.class), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
@@ -147,7 +152,7 @@ class TransactionImportServiceTest {
 
         assertThat(response.importedCount()).isEqualTo(1);
         assertThat(response.duplicateCount()).isZero();
-        verify(transactionRepository).findDuplicateKeysForAccountAndDateRange(
+        verify(transactionRepository).findDuplicateMatchesForAccountAndDateRange(
             2,
             row.transactionDate(),
             row.transactionDate()
@@ -189,7 +194,14 @@ class TransactionImportServiceTest {
         TransactionImportService importService = service();
         stubImportBatchSave();
         ParsedTransactionRow first = row(LocalDate.of(2026, 1, 10), "Coffee", "4.50");
-        ParsedTransactionRow second = row(LocalDate.of(2026, 1, 10), "Coffee", "4.500");
+        ParsedTransactionRow second = new ParsedTransactionRow(
+            3,
+            LocalDate.of(2026, 1, 10),
+            "Coffee",
+            "Coffee",
+            new BigDecimal("4.500"),
+            TransactionDirection.EXPENSE
+        );
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(2, List.of(first, second), List.of()));
@@ -198,6 +210,10 @@ class TransactionImportServiceTest {
 
         assertThat(response.importedCount()).isEqualTo(1);
         assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.duplicates()).hasSize(1);
+        assertThat(response.duplicates().getFirst().incoming().rowNumber()).isEqualTo(3);
+        assertThat(response.duplicates().getFirst().matchedTransaction().rowNumber()).isEqualTo(2);
+        assertThat(response.duplicates().getFirst().matchedTransaction().id()).isNull();
     }
 
     @Test
@@ -257,19 +273,21 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(2, List.of(first, second), List.of()));
-        when(transactionRepository.findDuplicateKeysForAccountAndDateRange(
+        when(transactionRepository.findDuplicateMatchesForAccountAndDateRange(
             1,
             first.transactionDate(),
             second.transactionDate()
         )).thenReturn(List.of(
-            duplicateKey(first.transactionDate(), first.description(), first.amount()),
-            duplicateKey(second.transactionDate(), second.description(), second.amount())
+            duplicateMatch(42, first.transactionDate(), first.description(), first.amount(), first.direction()),
+            duplicateMatch(43, second.transactionDate(), second.description(), second.amount(), second.direction())
         ));
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
         assertThat(response.importedCount()).isZero();
         assertThat(response.duplicateCount()).isEqualTo(2);
+        assertThat(response.duplicates()).extracting(duplicate -> duplicate.matchedTransaction().id())
+            .containsExactly(42, 43);
     }
 
     @Test
@@ -284,7 +302,7 @@ class TransactionImportServiceTest {
 
         importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
-        verify(transactionRepository, times(1)).findDuplicateKeysForAccountAndDateRange(
+        verify(transactionRepository, times(1)).findDuplicateMatchesForAccountAndDateRange(
             1,
             LocalDate.of(2026, 1, 10),
             LocalDate.of(2026, 1, 12)
@@ -392,8 +410,19 @@ class TransactionImportServiceTest {
         );
     }
 
-    private TransactionDuplicateKeyView duplicateKey(LocalDate date, String description, BigDecimal amount) {
-        return new TransactionDuplicateKeyView() {
+    private TransactionDuplicateMatchView duplicateMatch(
+        Integer id,
+        LocalDate date,
+        String description,
+        BigDecimal amount,
+        TransactionDirection direction
+    ) {
+        return new TransactionDuplicateMatchView() {
+            @Override
+            public Integer getId() {
+                return id;
+            }
+
             @Override
             public LocalDate getTransactionDate() {
                 return date;
@@ -407,6 +436,11 @@ class TransactionImportServiceTest {
             @Override
             public BigDecimal getAmount() {
                 return amount;
+            }
+
+            @Override
+            public TransactionDirection getDirection() {
+                return direction;
             }
         };
     }

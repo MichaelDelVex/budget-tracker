@@ -79,12 +79,27 @@ export interface ImportRowError {
   message: string;
 }
 
+export interface ImportDuplicateTransaction {
+  id: number | null;
+  rowNumber: number | null;
+  transactionDate: string;
+  description: string;
+  amount: number;
+  direction: TransactionDirection;
+}
+
+export interface ImportDuplicate {
+  incoming: ImportDuplicateTransaction;
+  matchedTransaction: ImportDuplicateTransaction;
+}
+
 export interface ImportSummary {
   totalRows: number;
   importedCount: number;
   duplicateCount: number;
   failedCount: number;
   errors: ImportRowError[];
+  duplicates: ImportDuplicate[];
 }
 
 export type ReportGroupBy = 'FORTNIGHT' | 'MONTH' | 'QUARTER' | 'YEAR';

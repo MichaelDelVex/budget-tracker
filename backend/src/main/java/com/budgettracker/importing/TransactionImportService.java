@@ -5,7 +5,8 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
-import com.budgettracker.domain.transaction.TransactionDuplicateKeyView;
+import com.budgettracker.domain.transaction.TransactionDirection;
+import com.budgettracker.domain.transaction.TransactionDuplicateMatchView;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -15,9 +16,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -103,7 +104,8 @@ public class TransactionImportService {
             insertResult.importedCount(),
             duplicateCount,
             parsedFile.errors().size(),
-            parsedFile.errors()
+            parsedFile.errors(),
+            candidates.duplicates()
         );
         logImportSummary(accountId, originalFilename, response);
         return response;
@@ -132,27 +134,43 @@ public class TransactionImportService {
 
     private ImportCandidateSelection selectImportCandidates(Integer accountId, List<ParsedTransactionRow> rows) {
         List<ParsedTransactionRow> importableRows = new ArrayList<>();
-        Set<DuplicateKey> existingKeys = existingDuplicateKeys(accountId, rows);
-        Set<DuplicateKey> seenInCurrentImport = new HashSet<>();
+        Map<DuplicateKey, ImportDuplicateTransactionResponse> existingMatches = existingDuplicateMatches(accountId, rows);
+        Map<DuplicateKey, ImportDuplicateTransactionResponse> seenInCurrentImport = new HashMap<>();
+        List<ImportDuplicateResponse> duplicates = new ArrayList<>();
         int duplicateCount = 0;
 
         for (ParsedTransactionRow row : rows) {
             String description = normaliseDescription(row.description());
             DuplicateKey key = DuplicateKey.from(accountId, row, description);
-            if (seenInCurrentImport.contains(key) || existingKeys.contains(key)) {
+            ImportDuplicateTransactionResponse matchedTransaction = existingMatches.get(key);
+            if (matchedTransaction == null) {
+                matchedTransaction = seenInCurrentImport.get(key);
+            }
+
+            if (matchedTransaction != null) {
                 duplicateCount++;
+                duplicates.add(new ImportDuplicateResponse(
+                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.amount(), row.direction()),
+                    matchedTransaction
+                ));
             } else {
-                seenInCurrentImport.add(key);
+                seenInCurrentImport.put(
+                    key,
+                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.amount(), row.direction())
+                );
                 importableRows.add(row);
             }
         }
 
-        return new ImportCandidateSelection(importableRows, duplicateCount);
+        return new ImportCandidateSelection(importableRows, duplicateCount, duplicates);
     }
 
-    private Set<DuplicateKey> existingDuplicateKeys(Integer accountId, List<ParsedTransactionRow> rows) {
+    private Map<DuplicateKey, ImportDuplicateTransactionResponse> existingDuplicateMatches(
+        Integer accountId,
+        List<ParsedTransactionRow> rows
+    ) {
         if (rows.isEmpty()) {
-            return Set.of();
+            return Map.of();
         }
 
         LocalDate dateFrom = rows.stream()
@@ -164,16 +182,23 @@ public class TransactionImportService {
             .max(LocalDate::compareTo)
             .orElseThrow();
 
-        Set<DuplicateKey> existingKeys = new HashSet<>();
-        for (TransactionDuplicateKeyView key : transactionRepository.findDuplicateKeysForAccountAndDateRange(
+        Map<DuplicateKey, ImportDuplicateTransactionResponse> existingMatches = new HashMap<>();
+        for (TransactionDuplicateMatchView match : transactionRepository.findDuplicateMatchesForAccountAndDateRange(
             accountId,
             dateFrom,
             dateTo
         )) {
-            existingKeys.add(DuplicateKey.fromExisting(accountId, key));
+            existingMatches.put(DuplicateKey.fromExisting(accountId, match), duplicateResponse(
+                match.getId(),
+                null,
+                match.getTransactionDate(),
+                match.getDescription(),
+                match.getAmount(),
+                match.getDirection()
+            ));
         }
 
-        return existingKeys;
+        return existingMatches;
     }
 
     private ImportInsertResult insertTransactions(
@@ -262,7 +287,8 @@ public class TransactionImportService {
             importedCount,
             duplicateCount,
             errors.size(),
-            errors
+            errors,
+            List.of()
         );
         logImportSummary(accountId, originalFilename, response);
         return response;
@@ -313,6 +339,24 @@ public class TransactionImportService {
         return description.trim().replaceAll("\\s+", " ");
     }
 
+    private ImportDuplicateTransactionResponse duplicateResponse(
+        Integer id,
+        Integer rowNumber,
+        LocalDate transactionDate,
+        String description,
+        BigDecimal amount,
+        TransactionDirection direction
+    ) {
+        return new ImportDuplicateTransactionResponse(
+            id,
+            rowNumber,
+            transactionDate,
+            description,
+            amount,
+            direction
+        );
+    }
+
     private void logImportSummary(Integer accountId, String originalFilename, ImportSummaryResponse response) {
         LOGGER.info(
             "CSV import completed accountId={} filename={} totalRows={} importedCount={} duplicateCount={} failedCount={}",
@@ -325,7 +369,11 @@ public class TransactionImportService {
         );
     }
 
-    private record ImportCandidateSelection(List<ParsedTransactionRow> importableRows, int duplicateCount) {
+    private record ImportCandidateSelection(
+        List<ParsedTransactionRow> importableRows,
+        int duplicateCount,
+        List<ImportDuplicateResponse> duplicates
+    ) {
     }
 
     private record ImportInsertResult(int importedCount, int duplicateCount) {
@@ -347,7 +395,7 @@ public class TransactionImportService {
             );
         }
 
-        static DuplicateKey fromExisting(Integer accountId, TransactionDuplicateKeyView key) {
+        static DuplicateKey fromExisting(Integer accountId, TransactionDuplicateMatchView key) {
             return new DuplicateKey(
                 accountId,
                 key.getTransactionDate(),
