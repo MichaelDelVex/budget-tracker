@@ -19,6 +19,18 @@ class NabCsvTransactionParserTest {
         assertThat(parser.supports("nab.csv", List.of("Date", "Description", "Debit", "Credit"))).isTrue();
         assertThat(parser.supports("nab.csv", List.of("Transaction Date", "Description", "Debit Amount", "Credit Amount")))
             .isTrue();
+        assertThat(parser.supports("nab.csv", List.of(
+            "Date",
+            "Amount",
+            "Account Number",
+            "",
+            "Transaction Type",
+            "Transaction Details",
+            "Balance",
+            "Category",
+            "Merchant Name",
+            "Processed On"
+        ))).isTrue();
     }
 
     @Test
@@ -111,6 +123,23 @@ class NabCsvTransactionParserTest {
         assertThat(parsed.rows().get(0).direction()).isEqualTo(TransactionDirection.EXPENSE);
         assertThat(parsed.rows().get(1).amount()).isEqualByComparingTo(new BigDecimal("12.00"));
         assertThat(parsed.rows().get(1).direction()).isEqualTo(TransactionDirection.INCOME);
+    }
+
+    @Test
+    void parsesCurrentNabExportWithTransactionDetailsAndShortMonthDate() throws Exception {
+        ParsedTransactionFile parsed = parser.parse(csv("""
+            Date,Amount,Account Number,,Transaction Type,Transaction Details,Balance,Category,Merchant Name,Processed On
+            17 Jun 26,-8.00,Card ending 6184,,PURCHASE AUTHORISATION,FrankstonHospitalCarPa Frankston 036,-8.00,Parking & tolls,Peninsula University Hospital (Parking),
+            """));
+
+        assertThat(parsed.totalRows()).isEqualTo(1);
+        assertThat(parsed.errors()).isEmpty();
+        ParsedTransactionRow row = parsed.rows().getFirst();
+        assertThat(row.transactionDate()).isEqualTo(LocalDate.of(2026, 6, 17));
+        assertThat(row.description()).isEqualTo("FrankstonHospitalCarPa Frankston 036");
+        assertThat(row.rawDescription()).isEqualTo("FrankstonHospitalCarPa Frankston 036");
+        assertThat(row.amount()).isEqualByComparingTo(new BigDecimal("8.00"));
+        assertThat(row.direction()).isEqualTo(TransactionDirection.EXPENSE);
     }
 
     @Test

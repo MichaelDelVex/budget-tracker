@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +29,11 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
         DateTimeFormatter.ISO_LOCAL_DATE,
         DateTimeFormatter.ofPattern("d/M/yyyy"),
         DateTimeFormatter.ofPattern("d/MM/yyyy"),
-        DateTimeFormatter.ofPattern("dd/MM/yyyy")
+        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+        shortMonthDateFormatter("d MMM yy"),
+        shortMonthDateFormatter("dd MMM yy"),
+        shortMonthDateFormatter("d MMM yyyy"),
+        shortMonthDateFormatter("dd MMM yyyy")
     );
 
     private static final CSVFormat CSV_FORMAT = CSVFormat.DEFAULT.builder()
@@ -216,10 +221,18 @@ public class NabCsvTransactionParser implements CsvTransactionParser {
 
         return switch (normalised) {
             case "transactiondate" -> "date";
+            case "transactiondetails" -> "details";
             case "debitamount" -> "debit";
             case "creditamount" -> "credit";
             default -> normalised;
         };
+    }
+
+    private static DateTimeFormatter shortMonthDateFormatter(String pattern) {
+        return new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern(pattern)
+            .toFormatter(Locale.ENGLISH);
     }
 
     private List<String> recordValues(CSVRecord record) {
