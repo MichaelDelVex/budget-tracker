@@ -3,6 +3,7 @@ package com.budgettracker.transaction;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -151,6 +153,59 @@ class TransactionServiceTest {
     }
 
     @Test
+    void throwsClearErrorWhenUpdateWouldCreateDuplicateTransaction() {
+        Transaction transaction = transactionWithId(1);
+        TransactionUpdateRequest request = updateRequest(4, null, null, null);
+        when(transactionRepository.findById(1)).thenReturn(Optional.of(transaction));
+        when(accountRepository.existsById(4)).thenReturn(true);
+        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmountAndIdNot(
+            request.accountId(),
+            request.transactionDate(),
+            request.description(),
+            request.amount(),
+            1
+        )).thenReturn(true);
+
+        assertThatThrownBy(() -> transactionService.updateTransaction(1, request))
+            .isInstanceOf(TransactionDuplicateException.class)
+            .hasMessage("This transaction already exists.");
+    }
+
+    @Test
+    void doesNotCheckDuplicateWhenOnlyCategoryAndTagChange() {
+        Transaction transaction = transactionWithId(1);
+        when(transactionRepository.findById(1)).thenReturn(Optional.of(transaction));
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(categoryRepository.existsById(5)).thenReturn(true);
+        when(tagRepository.existsById(6)).thenReturn(true);
+
+        TransactionResponse response = transactionService.updateTransaction(
+            1,
+            new TransactionUpdateRequest(
+                1,
+                transaction.getTransactionDate(),
+                transaction.getDescription(),
+                "Updated raw only",
+                transaction.getAmount(),
+                transaction.getDirection(),
+                5,
+                6,
+                null
+            )
+        );
+
+        assertThat(response.categoryId()).isEqualTo(5);
+        assertThat(response.tagId()).isEqualTo(6);
+        verify(transactionRepository, never()).existsByAccountIdAndTransactionDateAndDescriptionAndAmountAndIdNot(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
     void deletesTransaction() {
         when(transactionRepository.existsById(1)).thenReturn(true);
 
@@ -179,6 +234,12 @@ class TransactionServiceTest {
             3,
             null
         );
+    }
+
+    private static Transaction transactionWithId(Integer id) {
+        Transaction transaction = sampleTransaction();
+        ReflectionTestUtils.setField(transaction, "id", id);
+        return transaction;
     }
 
     private static TransactionUpdateRequest updateRequest(

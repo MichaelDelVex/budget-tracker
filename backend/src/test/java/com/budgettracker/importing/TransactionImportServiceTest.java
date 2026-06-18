@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.lenient;
@@ -15,6 +16,7 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
+import com.budgettracker.domain.transaction.TransactionDuplicateKeyView;
 import com.budgettracker.domain.transaction.TransactionDirection;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import java.math.BigDecimal;
@@ -90,7 +92,10 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(categorisationRuleMatcher.match("Coffee")).thenReturn(new MatchedCategorisation(2, 3));
+        when(categorisationRuleMatcher.loadSnapshot()).thenReturn(new CategorisationRuleSnapshot(
+            List.of(new CategorisationRuleSnapshot.RuleMatch("Coffee", 2, 3)),
+            null
+        ));
 
         importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
@@ -116,12 +121,11 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+        when(transactionRepository.findDuplicateKeysForAccountAndDateRange(
             1,
             row.transactionDate(),
-            row.description(),
-            row.amount()
-        )).thenReturn(true);
+            row.transactionDate()
+        )).thenReturn(List.of(duplicateKey(row.transactionDate(), row.description(), row.amount())));
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
@@ -138,17 +142,16 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(2)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-            eq(2),
-            eq(row.transactionDate()),
-            eq(row.description()),
-            eq(row.amount())
-        )).thenReturn(false);
 
         ImportSummaryResponse response = importService.importTransactions(2, csvFile("Date,Description,Amount\n"));
 
         assertThat(response.importedCount()).isEqualTo(1);
         assertThat(response.duplicateCount()).isZero();
+        verify(transactionRepository).findDuplicateKeysForAccountAndDateRange(
+            2,
+            row.transactionDate(),
+            row.transactionDate()
+        );
     }
 
     @Test
@@ -159,12 +162,6 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-            1,
-            row.transactionDate(),
-            row.description(),
-            row.amount()
-        )).thenReturn(false);
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
@@ -180,12 +177,6 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
-        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-            1,
-            row.transactionDate(),
-            row.description(),
-            row.amount()
-        )).thenReturn(false);
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
@@ -228,13 +219,6 @@ class TransactionImportServiceTest {
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
         assertThat(response.importedCount()).isEqualTo(1);
-        verify(transactionRepository).existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-            1,
-            LocalDate.of(2026, 1, 10),
-            "Coffee Shop",
-            new BigDecimal("4.50")
-        );
-        verify(categorisationRuleMatcher).match("Coffee Shop");
         verify(jdbcTemplate).update(
             any(String.class),
             eq(1),
@@ -250,6 +234,21 @@ class TransactionImportServiceTest {
     }
 
     @Test
+    void loadsCategorisationRulesOnceForImportBatch() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow first = row(LocalDate.of(2026, 1, 10), "Coffee", "4.50");
+        ParsedTransactionRow second = row(LocalDate.of(2026, 1, 11), "Lunch", "12.00");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(2, List.of(first, second), List.of()));
+
+        importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        verify(categorisationRuleMatcher, times(1)).loadSnapshot();
+    }
+
+    @Test
     void reimportingSameCsvImportsZeroNewRows() throws Exception {
         TransactionImportService importService = service();
         stubImportBatchSave();
@@ -258,17 +257,44 @@ class TransactionImportServiceTest {
         when(accountRepository.existsById(1)).thenReturn(true);
         when(parser.supports(any(), any())).thenReturn(true);
         when(parser.parse(any())).thenReturn(new ParsedTransactionFile(2, List.of(first, second), List.of()));
-        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-            eq(1),
-            any(LocalDate.class),
-            any(String.class),
-            any(BigDecimal.class)
-        )).thenReturn(true);
+        when(transactionRepository.findDuplicateKeysForAccountAndDateRange(
+            1,
+            first.transactionDate(),
+            second.transactionDate()
+        )).thenReturn(List.of(
+            duplicateKey(first.transactionDate(), first.description(), first.amount()),
+            duplicateKey(second.transactionDate(), second.description(), second.amount())
+        ));
 
         ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
 
         assertThat(response.importedCount()).isZero();
         assertThat(response.duplicateCount()).isEqualTo(2);
+    }
+
+    @Test
+    void preloadsExistingDuplicateKeysOnceForDateRange() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow first = row(LocalDate.of(2026, 1, 10), "Coffee", "4.50");
+        ParsedTransactionRow second = row(LocalDate.of(2026, 1, 12), "Lunch", "12.00");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(2, List.of(first, second), List.of()));
+
+        importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        verify(transactionRepository, times(1)).findDuplicateKeysForAccountAndDateRange(
+            1,
+            LocalDate.of(2026, 1, 10),
+            LocalDate.of(2026, 1, 12)
+        );
+        verify(transactionRepository, never()).existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+            any(),
+            any(),
+            any(),
+            any()
+        );
     }
 
     @Test
@@ -350,7 +376,8 @@ class TransactionImportServiceTest {
             List.of(parser),
             jdbcTemplate
         );
-        lenient().when(categorisationRuleMatcher.match(any())).thenReturn(new MatchedCategorisation(null, null));
+        lenient().when(categorisationRuleMatcher.loadSnapshot())
+            .thenReturn(new CategorisationRuleSnapshot(List.of(), null));
         return service;
     }
 
@@ -363,6 +390,25 @@ class TransactionImportServiceTest {
             new BigDecimal(amount),
             TransactionDirection.EXPENSE
         );
+    }
+
+    private TransactionDuplicateKeyView duplicateKey(LocalDate date, String description, BigDecimal amount) {
+        return new TransactionDuplicateKeyView() {
+            @Override
+            public LocalDate getTransactionDate() {
+                return date;
+            }
+
+            @Override
+            public String getDescription() {
+                return description;
+            }
+
+            @Override
+            public BigDecimal getAmount() {
+                return amount;
+            }
+        };
     }
 
     private void stubImportBatchSave() {

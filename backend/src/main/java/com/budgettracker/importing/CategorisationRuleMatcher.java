@@ -3,7 +3,6 @@ package com.budgettracker.importing;
 import com.budgettracker.domain.category.CategoryRepository;
 import com.budgettracker.domain.rule.CategorisationRule;
 import com.budgettracker.domain.rule.CategorisationRuleRepository;
-import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,19 +24,26 @@ public class CategorisationRuleMatcher {
 
     @Transactional(readOnly = true)
     public MatchedCategorisation match(String description) {
-        String normalisedDescription = description.toLowerCase(Locale.ROOT);
-        for (CategorisationRule rule : ruleRepository.findByActiveTrueOrderByPriorityAscIdAsc()) {
-            String matchText = rule.getMatchText().toLowerCase(Locale.ROOT);
-            if (normalisedDescription.contains(matchText)) {
-                return new MatchedCategorisation(
-                    rule.getCategory().getId(),
-                    rule.getTag() == null ? null : rule.getTag().getId()
-                );
-            }
-        }
+        return loadSnapshot().match(description);
+    }
 
-        return categoryRepository.findByNameIgnoreCaseAndActiveTrue(UNCATEGORISED)
-            .map(category -> new MatchedCategorisation(category.getId(), null))
-            .orElse(new MatchedCategorisation(null, null));
+    @Transactional(readOnly = true)
+    public CategorisationRuleSnapshot loadSnapshot() {
+        return new CategorisationRuleSnapshot(
+            ruleRepository.findByActiveTrueOrderByPriorityAscIdAsc().stream()
+                .map(this::toRuleMatch)
+                .toList(),
+            categoryRepository.findByNameIgnoreCaseAndActiveTrue(UNCATEGORISED)
+                .map(category -> category.getId())
+                .orElse(null)
+        );
+    }
+
+    private CategorisationRuleSnapshot.RuleMatch toRuleMatch(CategorisationRule rule) {
+        return new CategorisationRuleSnapshot.RuleMatch(
+            rule.getMatchText(),
+            rule.getCategory().getId(),
+            rule.getTag() == null ? null : rule.getTag().getId()
+        );
     }
 }

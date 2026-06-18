@@ -189,6 +189,20 @@ class TransactionControllerTest {
     }
 
     @Test
+    void returnsConflictWhenUpdateWouldCreateDuplicateTransaction() throws Exception {
+        when(transactionService.updateTransaction(
+            org.mockito.ArgumentMatchers.eq(1),
+            org.mockito.ArgumentMatchers.any(TransactionUpdateRequest.class)
+        )).thenThrow(new TransactionDuplicateException());
+
+        mockMvc.perform(put("/api/transactions/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validUpdateRequestJson(1, 2, 3)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("This transaction already exists."));
+    }
+
+    @Test
     void deletesTransaction() throws Exception {
         doNothing().when(transactionService).deleteTransaction(1);
 

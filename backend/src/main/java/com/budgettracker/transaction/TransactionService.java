@@ -18,6 +18,8 @@ import com.budgettracker.domain.transaction.Transaction;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import com.budgettracker.importing.ImportBatchNotFoundException;
 import com.budgettracker.tag.TagNotFoundException;
+import java.math.BigDecimal;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -66,6 +68,7 @@ public class TransactionService {
             .orElseThrow(() -> new TransactionNotFoundException(id));
 
         validateReferences(request);
+        validateDuplicateKey(transaction, request);
 
         transaction.update(
             request.accountId(),
@@ -118,5 +121,32 @@ public class TransactionService {
         if (request.importBatchId() != null && !importBatchRepository.existsById(request.importBatchId())) {
             throw new ImportBatchNotFoundException(request.importBatchId());
         }
+    }
+
+    private void validateDuplicateKey(Transaction transaction, TransactionUpdateRequest request) {
+        if (!duplicateKeyChanged(transaction, request)) {
+            return;
+        }
+
+        if (transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmountAndIdNot(
+            request.accountId(),
+            request.transactionDate(),
+            request.description(),
+            request.amount(),
+            transaction.getId()
+        )) {
+            throw new TransactionDuplicateException();
+        }
+    }
+
+    private boolean duplicateKeyChanged(Transaction transaction, TransactionUpdateRequest request) {
+        return !Objects.equals(transaction.getAccountId(), request.accountId())
+            || !Objects.equals(transaction.getTransactionDate(), request.transactionDate())
+            || !Objects.equals(transaction.getDescription(), request.description())
+            || moneyChanged(transaction.getAmount(), request.amount());
+    }
+
+    private boolean moneyChanged(BigDecimal current, BigDecimal requested) {
+        return current.compareTo(requested) != 0;
     }
 }

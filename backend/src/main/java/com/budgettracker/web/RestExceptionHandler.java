@@ -7,6 +7,7 @@ import com.budgettracker.importing.ImportBatchNotFoundException;
 import com.budgettracker.rule.CategorisationRuleNotFoundException;
 import com.budgettracker.tag.TagNotFoundException;
 import com.budgettracker.importing.UnsupportedCsvFormatException;
+import com.budgettracker.transaction.TransactionDuplicateException;
 import com.budgettracker.transaction.TransactionNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
@@ -95,6 +96,11 @@ public class RestExceptionHandler {
     public ResponseEntity<ApiError> handleConflict(DataIntegrityViolationException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ApiError.of(conflictMessage(exception)));
+    }
+
+    @ExceptionHandler(TransactionDuplicateException.class)
+    public ResponseEntity<ApiError> handleConflict(TransactionDuplicateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiError.of(exception.getMessage()));
     }
 
     private String conflictMessage(DataIntegrityViolationException exception) {

@@ -5,6 +5,7 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
+import com.budgettracker.domain.transaction.TransactionDuplicateKeyView;
 import com.budgettracker.domain.transaction.TransactionRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -108,9 +109,14 @@ public class TransactionImportService {
         return response;
     }
 
-    private Transaction toTransaction(Integer accountId, Integer importBatchId, ParsedTransactionRow row) {
+    private Transaction toTransaction(
+        Integer accountId,
+        Integer importBatchId,
+        ParsedTransactionRow row,
+        CategorisationRuleSnapshot ruleSnapshot
+    ) {
         String description = normaliseDescription(row.description());
-        MatchedCategorisation categorisation = categorisationRuleMatcher.match(description);
+        MatchedCategorisation categorisation = ruleSnapshot.match(description);
         return new Transaction(
             accountId,
             row.transactionDate(),
@@ -126,18 +132,14 @@ public class TransactionImportService {
 
     private ImportCandidateSelection selectImportCandidates(Integer accountId, List<ParsedTransactionRow> rows) {
         List<ParsedTransactionRow> importableRows = new ArrayList<>();
+        Set<DuplicateKey> existingKeys = existingDuplicateKeys(accountId, rows);
         Set<DuplicateKey> seenInCurrentImport = new HashSet<>();
         int duplicateCount = 0;
 
         for (ParsedTransactionRow row : rows) {
             String description = normaliseDescription(row.description());
             DuplicateKey key = DuplicateKey.from(accountId, row, description);
-            if (seenInCurrentImport.contains(key) || transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
-                accountId,
-                row.transactionDate(),
-                description,
-                row.amount()
-            )) {
+            if (seenInCurrentImport.contains(key) || existingKeys.contains(key)) {
                 duplicateCount++;
             } else {
                 seenInCurrentImport.add(key);
@@ -148,6 +150,32 @@ public class TransactionImportService {
         return new ImportCandidateSelection(importableRows, duplicateCount);
     }
 
+    private Set<DuplicateKey> existingDuplicateKeys(Integer accountId, List<ParsedTransactionRow> rows) {
+        if (rows.isEmpty()) {
+            return Set.of();
+        }
+
+        LocalDate dateFrom = rows.stream()
+            .map(ParsedTransactionRow::transactionDate)
+            .min(LocalDate::compareTo)
+            .orElseThrow();
+        LocalDate dateTo = rows.stream()
+            .map(ParsedTransactionRow::transactionDate)
+            .max(LocalDate::compareTo)
+            .orElseThrow();
+
+        Set<DuplicateKey> existingKeys = new HashSet<>();
+        for (TransactionDuplicateKeyView key : transactionRepository.findDuplicateKeysForAccountAndDateRange(
+            accountId,
+            dateFrom,
+            dateTo
+        )) {
+            existingKeys.add(DuplicateKey.fromExisting(accountId, key));
+        }
+
+        return existingKeys;
+    }
+
     private ImportInsertResult insertTransactions(
         Integer accountId,
         Integer importBatchId,
@@ -155,10 +183,11 @@ public class TransactionImportService {
     ) {
         int importedCount = 0;
         int duplicateCount = 0;
+        CategorisationRuleSnapshot ruleSnapshot = categorisationRuleMatcher.loadSnapshot();
 
         for (ParsedTransactionRow row : rows) {
             try {
-                insertTransaction(toTransaction(accountId, importBatchId, row));
+                insertTransaction(toTransaction(accountId, importBatchId, row, ruleSnapshot));
                 importedCount++;
             } catch (DataIntegrityViolationException exception) {
                 if (!isDuplicateConstraintViolation(exception)) {
@@ -315,6 +344,15 @@ public class TransactionImportService {
                 row.transactionDate(),
                 description,
                 row.amount().stripTrailingZeros()
+            );
+        }
+
+        static DuplicateKey fromExisting(Integer accountId, TransactionDuplicateKeyView key) {
+            return new DuplicateKey(
+                accountId,
+                key.getTransactionDate(),
+                key.getDescription(),
+                key.getAmount().stripTrailingZeros()
             );
         }
     }
