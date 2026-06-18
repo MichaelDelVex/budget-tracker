@@ -6,6 +6,7 @@ import App from './App';
 const accounts = [{ id: 1, name: 'Everyday', bank: 'Bank', accountType: 'CHECKING', createdAt: '', updatedAt: '' }];
 const categories = [
   { id: 2, name: 'Dining', type: 'EXPENSE', defaultCategory: true, active: true, sortOrder: 10, createdAt: '', updatedAt: '' },
+  { id: 7, name: 'Travel', type: 'EXPENSE', defaultCategory: false, active: true, sortOrder: 20, createdAt: '', updatedAt: '' },
 ];
 const tags = [{ id: 3, name: 'Tax', color: '#336699', createdAt: '', updatedAt: '' }];
 const rules = [{ id: 4, matchText: 'coffee', categoryId: 2, tagId: 3, active: true, priority: 10, createdAt: '', updatedAt: '' }];
@@ -175,6 +176,21 @@ describe('App', () => {
     expect(within(summary).getByText('2')).toBeInTheDocument();
   });
 
+  it('displays failed import errors from the API', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
+    vi.stubGlobal('fetch', vi.fn(mockImportFailureFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    expect(await screen.findByText(/unable to import csv/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/import summary/i)).not.toBeInTheDocument();
+  });
+
   it('displays oversized CSV upload errors', async () => {
     const user = userEvent.setup();
     const file = new File(['Date,Description,Amount'], 'large-transactions.csv', { type: 'text/csv' });
@@ -187,6 +203,43 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /import transactions/i }));
 
     expect(await screen.findByText(/csv file is too large/i)).toBeInTheDocument();
+  });
+
+  it('shows transaction update errors and restores the previous assignment', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn(mockTransactionUpdateFailureFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /transactions/i }));
+
+    const categorySelect = await screen.findByLabelText(/category for coffee shop/i);
+    expect(categorySelect).toHaveValue('2');
+    await user.selectOptions(categorySelect, '7');
+
+    expect(await screen.findByText(/transaction could not be updated/i)).toBeInTheDocument();
+    expect(categorySelect).toHaveValue('2');
+    expect(screen.queryByText(/updated successfully/i)).not.toBeInTheDocument();
+  });
+
+  it('shows delete errors and keeps the item visible when deletion fails', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn(mockDeleteFailureFetch));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /categories & tags/i }));
+    expect(await screen.findByText('Dining')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /^delete$/i })[0]);
+
+    expect(await screen.findByText(/category is still used by transactions/i)).toBeInTheDocument();
+    expect(screen.getByText('Dining')).toBeInTheDocument();
+  });
+
+  it('shows a dashboard error state when report requests fail', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockReportFailureFetch));
+    render(<App />);
+
+    expect(await screen.findByText(/unable to load reports/i)).toBeInTheDocument();
+    expect(screen.getByText('Income')).toBeInTheDocument();
   });
 
   it('renders category and tag forms', async () => {
@@ -334,6 +387,66 @@ async function mockOversizedUploadFetch(input: RequestInfo | URL) {
       fields: {},
     }), {
       status: 413,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+async function mockImportFailureFetch(input: RequestInfo | URL) {
+  const url = input.toString();
+  if (url.startsWith('/api/imports/transactions')) {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'Unable to import CSV. Check the file and try again.',
+      fields: {},
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+async function mockTransactionUpdateFailureFetch(input: RequestInfo | URL, options?: RequestInit) {
+  const url = input.toString();
+  if (url.startsWith('/api/transactions/5') && options?.method === 'PUT') {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'Transaction could not be updated.',
+      fields: {},
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+async function mockDeleteFailureFetch(input: RequestInfo | URL, options?: RequestInit) {
+  const url = input.toString();
+  if (url.startsWith('/api/categories/2') && options?.method === 'DELETE') {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'Category is still used by transactions.',
+      fields: {},
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  return mockFetch(input);
+}
+
+async function mockReportFailureFetch(input: RequestInfo | URL) {
+  const url = input.toString();
+  if (url.startsWith('/api/reports/')) {
+    return Promise.resolve(new Response(JSON.stringify({
+      message: 'Unable to load reports.',
+      fields: {},
+    }), {
+      status: 500,
       headers: { 'Content-Type': 'application/json' },
     }));
   }
