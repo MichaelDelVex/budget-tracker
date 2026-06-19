@@ -101,6 +101,13 @@ export interface UnmatchedImportCategory {
   name: string;
   type: CategoryType;
   rowCount: number;
+  rows: Array<{
+    rowNumber: number;
+    transactionDate: string;
+    description: string;
+    amount: number;
+    direction: TransactionDirection;
+  }>;
 }
 
 export interface ImportSummary {

@@ -335,13 +335,23 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /import transactions/i }));
 
     const unmatched = await screen.findByLabelText(/unmatched csv categories/i);
-    expect(within(unmatched).getByText(/parking & tolls \(expense, 2 rows\)/i)).toBeInTheDocument();
-    await user.click(within(unmatched).getByRole('button', { name: /add category/i }));
+    expect(within(unmatched).getByText(/parking & tolls \(expense\)/i)).toBeInTheDocument();
+    expect(within(unmatched).getByText(/2 rows/i)).toBeInTheDocument();
+    await user.click(within(unmatched).getByText(/2 rows/i));
+    expect(within(unmatched).getByText(/row 2: 2026-01-10 - hospital parking/i)).toBeInTheDocument();
+    await user.clear(within(unmatched).getByLabelText(/category name for parking & tolls/i));
+    await user.type(within(unmatched).getByLabelText(/category name for parking & tolls/i), 'Parking');
+    await user.click(within(unmatched).getByRole('button', { name: /add mapping/i }));
 
     await waitFor(() => {
-      expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
-        url.toString() === '/api/categories' && options?.method === 'POST'
-      )).toBe(true);
+      const mappingCall = vi.mocked(fetch).mock.calls.find(([url, options]) =>
+        url.toString() === '/api/imports/csv-categories' && options?.method === 'POST'
+      );
+      expect(mappingCall).toBeDefined();
+      const body = JSON.parse(mappingCall?.[1]?.body as string);
+      expect(body.sourceName).toBe('Parking & tolls');
+      expect(body.categoryName).toBe('Parking');
+      expect(body.type).toBe('EXPENSE');
     });
   });
 
@@ -579,6 +589,12 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
     }
     return json(transactions);
   }
+  if (url.startsWith('/api/imports/csv-categories')) {
+    return json({
+      sourceName: 'Parking & tolls',
+      category: { id: 8, name: 'Parking', type: 'EXPENSE', defaultCategory: false, active: true, sortOrder: 500, createdAt: '', updatedAt: '' },
+    });
+  }
   if (url.startsWith('/api/imports/transactions')) {
     return json({
       totalRows: 2,
@@ -586,7 +602,27 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
       duplicateCount: 1,
       failedCount: 0,
       errors: [],
-      unmatchedCategories: [{ name: 'Parking & tolls', type: 'EXPENSE', rowCount: 2 }],
+      unmatchedCategories: [{
+        name: 'Parking & tolls',
+        type: 'EXPENSE',
+        rowCount: 2,
+        rows: [
+          {
+            rowNumber: 2,
+            transactionDate: '2026-01-10',
+            description: 'Hospital parking',
+            amount: 8,
+            direction: 'EXPENSE',
+          },
+          {
+            rowNumber: 3,
+            transactionDate: '2026-01-11',
+            description: 'Street parking',
+            amount: 4,
+            direction: 'EXPENSE',
+          },
+        ],
+      }],
       duplicates: [{
         incoming: {
           id: null,

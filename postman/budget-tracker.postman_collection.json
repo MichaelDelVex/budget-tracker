@@ -770,6 +770,29 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create CSV Category Mapping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Creates or reuses an app category and maps the CSV category text to it for future imports.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceName\": \"Parking & tolls\",\n  \"categoryName\": \"Parking\",\n  \"type\": \"EXPENSE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/imports/csv-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "imports", "csv-categories"]
+            }
+          },
+          "response": []
         }
       ]
     }

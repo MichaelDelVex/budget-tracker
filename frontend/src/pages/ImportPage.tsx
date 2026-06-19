@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { ApiError } from '../api/client';
-import { createCategory, createTransaction, getAccounts, importTransactions } from '../api/budgetApi';
+import { createCsvCategoryMapping, createTransaction, getAccounts, importTransactions } from '../api/budgetApi';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { LoadingState } from '../components/LoadingState';
 import type { Account, ImportDuplicateTransaction, ImportSummary, UnmatchedImportCategory } from '../types/api';
@@ -13,6 +13,7 @@ export function ImportPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
   const duplicates = summary?.duplicates ?? [];
   const unmatchedCategories = summary?.unmatchedCategories ?? [];
 
@@ -57,22 +58,35 @@ export function ImportPage() {
   }
 
   async function addCategory(category: UnmatchedImportCategory) {
+    const categoryName = (categoryNames[categoryKey(category)] ?? category.name).trim();
+    if (!categoryName) {
+      setError('Enter a category name before adding the CSV category.');
+      return;
+    }
+
     try {
-      await createCategory({
-        name: category.name,
+      await createCsvCategoryMapping({
+        sourceName: category.name,
+        categoryName,
         type: category.type,
-        defaultCategory: false,
-        active: true,
-        sortOrder: 500,
       });
       setSummary((current) => current ? {
         ...current,
         unmatchedCategories: current.unmatchedCategories.filter((item) => item.name !== category.name || item.type !== category.type),
       } : current);
+      setCategoryNames((current) => {
+        const next = { ...current };
+        delete next[categoryKey(category)];
+        return next;
+      });
       setError(null);
     } catch (exception) {
       setError((exception as Error).message);
     }
+  }
+
+  function updateCategoryName(category: UnmatchedImportCategory, name: string) {
+    setCategoryNames((current) => ({ ...current, [categoryKey(category)]: name }));
   }
 
   async function addDuplicateAnyway(duplicate: ImportSummary['duplicates'][number]) {
@@ -146,15 +160,47 @@ export function ImportPage() {
           {unmatchedCategories.length > 0 ? (
             <section className="duplicate-review" aria-label="Unmatched CSV categories">
               <h4>New CSV categories found</h4>
-              <p className="status-text">Add these as app categories if you want future imports to assign them automatically.</p>
-              <ul className="review-list">
-                {unmatchedCategories.map((category) => (
-                  <li key={`${category.type}-${category.name}`}>
-                    <span>{category.name} ({category.type.toLowerCase()}, {category.rowCount} rows)</span>
-                    <button type="button" onClick={() => addCategory(category)}>Add category</button>
-                  </li>
-                ))}
-              </ul>
+              <p className="status-text">Review CSV categories, choose the app category name, then add a mapping for future imports.</p>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>CSV category</th>
+                      <th>Rows matched</th>
+                      <th>App category name</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unmatchedCategories.map((category) => (
+                      <tr key={`${category.type}-${category.name}`}>
+                        <td>{category.name} ({category.type.toLowerCase()})</td>
+                        <td>
+                          <details>
+                            <summary>{category.rowCount} rows</summary>
+                            <ul className="compact-row-list">
+                              {category.rows.map((row) => (
+                                <li key={row.rowNumber}>
+                                  Row {row.rowNumber}: {row.transactionDate} - {row.description} - {row.direction} ${row.amount.toFixed(2)}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </td>
+                        <td>
+                          <label className="visually-hidden" htmlFor={`category-name-${categoryKey(category)}`}>Category name for {category.name}</label>
+                          <input
+                            id={`category-name-${categoryKey(category)}`}
+                            value={categoryNames[categoryKey(category)] ?? category.name}
+                            onChange={(event) => updateCategoryName(category, event.target.value)}
+                          />
+                        </td>
+                        <td><button type="button" onClick={() => addCategory(category)}>Add mapping</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           ) : null}
           {duplicates.length > 0 ? (
@@ -202,4 +248,8 @@ function formatMatchSource(transaction: ImportDuplicateTransaction) {
 
 function formatDuplicateTransaction(transaction: ImportDuplicateTransaction) {
   return `${transaction.transactionDate} - ${transaction.description} - ${transaction.direction} $${transaction.amount.toFixed(2)}`;
+}
+
+function categoryKey(category: UnmatchedImportCategory) {
+  return `${category.type}-${encodeURIComponent(category.name)}`;
 }

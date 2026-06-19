@@ -4,10 +4,13 @@ import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.budgettracker.account.AccountNotFoundException;
+import com.budgettracker.category.CategoryResponse;
+import com.budgettracker.domain.category.CategoryType;
 import com.budgettracker.web.RestExceptionHandler;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -29,6 +32,9 @@ class ImportControllerTest {
 
     @MockBean
     private TransactionImportService transactionImportService;
+
+    @MockBean
+    private CsvCategoryMappingService csvCategoryMappingService;
 
     @Test
     void importsTransactionsCsv() throws Exception {
@@ -66,6 +72,27 @@ class ImportControllerTest {
                 .param("accountId", "99"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.message").value("Account not found: 99"));
+    }
+
+    @Test
+    void createsCsvCategoryMapping() throws Exception {
+        when(csvCategoryMappingService.createMapping(any())).thenReturn(new CsvCategoryMappingResponse(
+            "Parking & tolls",
+            new CategoryResponse(12, "Parking", CategoryType.EXPENSE, false, true, 500, null, null)
+        ));
+
+        mockMvc.perform(post("/api/imports/csv-categories")
+                .contentType("application/json")
+                .content("""
+                    {
+                      "sourceName": "Parking & tolls",
+                      "categoryName": "Parking",
+                      "type": "EXPENSE"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sourceName").value("Parking & tolls"))
+            .andExpect(jsonPath("$.category.name").value("Parking"));
     }
 
     private MockMultipartFile csvFile(String content) {

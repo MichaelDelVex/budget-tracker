@@ -166,7 +166,7 @@ Current CSV support is NAB-style exports. The parser normalises signed CSV amoun
 
 Duplicate detection skips rows with the same account, transaction date, description, and amount. The import summary includes duplicate details so the Import page can show the uploaded row and the existing transaction or earlier CSV row it matched.
 
-When a CSV includes a `Category` column, imports first try to match that value to an active app category with the same income/expense type. Unknown CSV categories are shown in the import summary with an option to add them as app categories for future imports. If no CSV category match exists, imports apply active categorisation rules by priority. If no rule matches, the active `Uncategorised` category is used when available.
+When a CSV includes a `Category` column, imports first try to match that value to a saved CSV category mapping, then to an active app category with the same income/expense type. Unknown CSV categories are shown in the import summary with matched rows, an editable app category name, and an option to save the mapping for future imports. If no CSV category match exists, imports apply active categorisation rules by priority. If no rule matches, the active `Uncategorised` category is used when available.
 
 ## API Overview
 
@@ -230,6 +230,13 @@ GET /api/categorisation-rules
 POST /api/categorisation-rules
 PUT /api/categorisation-rules/{id}
 DELETE /api/categorisation-rules/{id}
+```
+
+Imports:
+
+```http
+POST /api/imports/transactions
+POST /api/imports/csv-categories
 ```
 
 Budgets:

@@ -16,6 +16,8 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.category.Category;
 import com.budgettracker.domain.category.CategoryRepository;
 import com.budgettracker.domain.category.CategoryType;
+import com.budgettracker.domain.importing.CsvCategoryMapping;
+import com.budgettracker.domain.importing.CsvCategoryMappingRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
@@ -45,6 +47,9 @@ class TransactionImportServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private CsvCategoryMappingRepository csvCategoryMappingRepository;
 
     @Mock
     private ImportBatchRepository importBatchRepository;
@@ -180,7 +185,14 @@ class TransactionImportServiceTest {
         assertThat(response.unmatchedCategories()).containsExactly(new UnmatchedImportCategoryResponse(
             "Parking & tolls",
             CategoryType.EXPENSE,
-            1
+            1,
+            List.of(new UnmatchedImportCategoryRowResponse(
+                2,
+                LocalDate.of(2026, 1, 10),
+                "Hospital parking",
+                new BigDecimal("8.00"),
+                TransactionDirection.EXPENSE
+            ))
         ));
         verify(jdbcTemplate).update(
             any(String.class),
@@ -191,6 +203,39 @@ class TransactionImportServiceTest {
             eq(new BigDecimal("8.00")),
             eq("EXPENSE"),
             eq(5),
+            eq(null),
+            eq(7)
+        );
+    }
+
+    @Test
+    void appliesCsvCategoryMappingOnFutureImports() throws Exception {
+        TransactionImportService importService = service();
+        stubImportBatchSave();
+        ParsedTransactionRow row = rowWithCsvCategory(
+            LocalDate.of(2026, 1, 10),
+            "Hospital parking",
+            "Parking & tolls",
+            "8.00"
+        );
+        CsvCategoryMapping mapping = new CsvCategoryMapping("Parking & tolls", CategoryType.EXPENSE, 15);
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(csvCategoryMappingRepository.findAll()).thenReturn(List.of(mapping));
+        when(parser.supports(any(), any())).thenReturn(true);
+        when(parser.parse(any())).thenReturn(new ParsedTransactionFile(1, List.of(row), List.of()));
+
+        ImportSummaryResponse response = importService.importTransactions(1, csvFile("Date,Description,Amount\n"));
+
+        assertThat(response.unmatchedCategories()).isEmpty();
+        verify(jdbcTemplate).update(
+            any(String.class),
+            eq(1),
+            eq("2026-01-10"),
+            eq("Hospital parking"),
+            eq("Hospital parking"),
+            eq(new BigDecimal("8.00")),
+            eq("EXPENSE"),
+            eq(15),
             eq(null),
             eq(7)
         );
@@ -476,6 +521,7 @@ class TransactionImportServiceTest {
         TransactionImportService service = new TransactionImportService(
             accountRepository,
             categoryRepository,
+            csvCategoryMappingRepository,
             importBatchRepository,
             transactionRepository,
             categorisationRuleMatcher,
@@ -485,6 +531,7 @@ class TransactionImportServiceTest {
         lenient().when(categorisationRuleMatcher.loadSnapshot())
             .thenReturn(new CategorisationRuleSnapshot(List.of(), null));
         lenient().when(categoryRepository.findAllByOrderBySortOrderAscNameAsc()).thenReturn(List.of());
+        lenient().when(csvCategoryMappingRepository.findAll()).thenReturn(List.of());
         return service;
     }
 

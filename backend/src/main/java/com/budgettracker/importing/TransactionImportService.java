@@ -5,6 +5,8 @@ import com.budgettracker.domain.account.AccountRepository;
 import com.budgettracker.domain.category.Category;
 import com.budgettracker.domain.category.CategoryRepository;
 import com.budgettracker.domain.category.CategoryType;
+import com.budgettracker.domain.importing.CsvCategoryMapping;
+import com.budgettracker.domain.importing.CsvCategoryMappingRepository;
 import com.budgettracker.domain.importing.ImportBatch;
 import com.budgettracker.domain.importing.ImportBatchRepository;
 import com.budgettracker.domain.transaction.Transaction;
@@ -21,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ public class TransactionImportService {
 
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
+    private final CsvCategoryMappingRepository csvCategoryMappingRepository;
     private final ImportBatchRepository importBatchRepository;
     private final TransactionRepository transactionRepository;
     private final CategorisationRuleMatcher categorisationRuleMatcher;
@@ -48,6 +50,7 @@ public class TransactionImportService {
     public TransactionImportService(
         AccountRepository accountRepository,
         CategoryRepository categoryRepository,
+        CsvCategoryMappingRepository csvCategoryMappingRepository,
         ImportBatchRepository importBatchRepository,
         TransactionRepository transactionRepository,
         CategorisationRuleMatcher categorisationRuleMatcher,
@@ -56,6 +59,7 @@ public class TransactionImportService {
     ) {
         this.accountRepository = accountRepository;
         this.categoryRepository = categoryRepository;
+        this.csvCategoryMappingRepository = csvCategoryMappingRepository;
         this.importBatchRepository = importBatchRepository;
         this.transactionRepository = transactionRepository;
         this.categorisationRuleMatcher = categorisationRuleMatcher;
@@ -364,6 +368,14 @@ public class TransactionImportService {
     }
 
     private CsvCategorySelection selectCsvCategories(List<ParsedTransactionRow> rows) {
+        Map<CategoryKey, Integer> mappingsBySourceNameAndType = new HashMap<>();
+        for (CsvCategoryMapping mapping : csvCategoryMappingRepository.findAll()) {
+            mappingsBySourceNameAndType.put(
+                CategoryKey.fromNormalised(mapping.getNormalizedSourceName(), mapping.getType()),
+                mapping.getCategoryId()
+            );
+        }
+
         Map<CategoryKey, Integer> categoriesByNameAndType = new HashMap<>();
         for (Category category : categoryRepository.findAllByOrderBySortOrderAscNameAsc()) {
             if (category.isActive()) {
@@ -377,17 +389,28 @@ public class TransactionImportService {
             return nameComparison != 0 ? nameComparison : left.type().compareTo(right.type());
         });
         Map<CategoryKey, String> unmatchedCategoryDisplayNames = new HashMap<>();
+        Map<CategoryKey, List<UnmatchedImportCategoryRowResponse>> unmatchedCategoryRows = new HashMap<>();
         for (ParsedTransactionRow row : rows) {
             if (row.csvCategory() == null || row.csvCategory().isBlank()) {
                 continue;
             }
 
             CategoryType type = categoryType(row.direction());
-            Integer categoryId = categoriesByNameAndType.get(CategoryKey.from(row.csvCategory(), type));
+            CategoryKey key = CategoryKey.from(row.csvCategory(), type);
+            Integer categoryId = mappingsBySourceNameAndType.get(key);
             if (categoryId == null) {
-                CategoryKey key = CategoryKey.from(row.csvCategory(), type);
+                categoryId = categoriesByNameAndType.get(key);
+            }
+            if (categoryId == null) {
                 unmatchedCategoryDisplayNames.putIfAbsent(key, row.csvCategory().trim());
                 unmatchedCategoryCounts.merge(key, 1, Integer::sum);
+                unmatchedCategoryRows.computeIfAbsent(key, ignored -> new ArrayList<>()).add(new UnmatchedImportCategoryRowResponse(
+                    row.rowNumber(),
+                    row.transactionDate(),
+                    normaliseDescription(row.description()),
+                    row.amount(),
+                    row.direction()
+                ));
             } else {
                 categoryIdsByRowNumber.put(row.rowNumber(), categoryId);
             }
@@ -399,7 +422,8 @@ public class TransactionImportService {
                 .map(entry -> new UnmatchedImportCategoryResponse(
                     unmatchedCategoryDisplayNames.get(entry.getKey()),
                     entry.getKey().type(),
-                    entry.getValue()
+                    entry.getValue(),
+                    unmatchedCategoryRows.getOrDefault(entry.getKey(), List.of())
                 ))
                 .toList()
         );
@@ -464,7 +488,11 @@ public class TransactionImportService {
     private record CategoryKey(String name, CategoryType type) {
 
         static CategoryKey from(String name, CategoryType type) {
-            return new CategoryKey(name.trim().toLowerCase(Locale.ROOT), type);
+            return new CategoryKey(CsvCategoryMapping.normalise(name), type);
+        }
+
+        static CategoryKey fromNormalised(String name, CategoryType type) {
+            return new CategoryKey(name, type);
         }
     }
 

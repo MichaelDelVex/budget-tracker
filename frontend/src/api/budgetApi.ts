@@ -72,6 +72,17 @@ export function createCategory(payload: CategoryPayload) {
   return request<Category>('/api/categories', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function createCsvCategoryMapping(payload: {
+  sourceName: string;
+  categoryName: string;
+  type: CategoryType;
+}) {
+  return request<{ sourceName: string; category: Category }>('/api/imports/csv-categories', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateCategory(id: number, payload: CategoryPayload) {
   return request<Category>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }

@@ -195,6 +195,16 @@ p {
   grid-column: 1 / -1;
 }
 
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -453,6 +463,15 @@ th {
 
 .duplicate-review td {
   min-width: 12rem;
+}
+
+.compact-row-list {
+  color: #51606f;
+  display: grid;
+  font-size: 0.86rem;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding-left: 1rem;
 }
 
 .report-list {
