@@ -11,7 +11,13 @@ public interface TransactionDuplicateMatchView {
 
     String getDescription();
 
+    String getRawDescription();
+
     BigDecimal getAmount();
 
     TransactionDirection getDirection();
+
+    Integer getCategoryId();
+
+    Integer getTagId();
 }

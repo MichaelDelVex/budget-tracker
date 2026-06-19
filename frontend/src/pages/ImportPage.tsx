@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { ApiError } from '../api/client';
-import { createCategory, getAccounts, importTransactions } from '../api/budgetApi';
+import { createCategory, createTransaction, getAccounts, importTransactions } from '../api/budgetApi';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { LoadingState } from '../components/LoadingState';
 import type { Account, ImportDuplicateTransaction, ImportSummary, UnmatchedImportCategory } from '../types/api';
@@ -75,6 +75,45 @@ export function ImportPage() {
     }
   }
 
+  async function addDuplicateAnyway(duplicate: ImportSummary['duplicates'][number]) {
+    if (!accountId) {
+      setError('Choose an account before adding a duplicate transaction.');
+      return;
+    }
+
+    const suggestedDescription = `${duplicate.incoming.description} #2`;
+    const description = window.prompt('Use a distinct description for this separate transaction.', suggestedDescription);
+    if (description === null) {
+      return;
+    }
+    if (!description.trim()) {
+      setError('Enter a description before adding the duplicate transaction.');
+      return;
+    }
+
+    try {
+      await createTransaction({
+        accountId: Number(accountId),
+        transactionDate: duplicate.incoming.transactionDate,
+        description: description.trim(),
+        rawDescription: duplicate.incoming.rawDescription,
+        amount: duplicate.incoming.amount,
+        direction: duplicate.incoming.direction,
+        categoryId: duplicate.matchedTransaction.categoryId,
+        tagId: duplicate.matchedTransaction.tagId,
+      });
+      setSummary((current) => current ? {
+        ...current,
+        importedCount: current.importedCount + 1,
+        duplicateCount: Math.max(0, current.duplicateCount - 1),
+        duplicates: current.duplicates.filter((item) => item !== duplicate),
+      } : current);
+      setError(null);
+    } catch (exception) {
+      setError((exception as Error).message);
+    }
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header">
@@ -129,6 +168,7 @@ export function ImportPage() {
                       <th>Uploaded transaction</th>
                       <th>Matched against</th>
                       <th>Matched transaction</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -138,6 +178,7 @@ export function ImportPage() {
                         <td>{formatDuplicateTransaction(duplicate.incoming)}</td>
                         <td>{formatMatchSource(duplicate.matchedTransaction)}</td>
                         <td>{formatDuplicateTransaction(duplicate.matchedTransaction)}</td>
+                        <td><button type="button" onClick={() => addDuplicateAnyway(duplicate)}>Add anyway</button></td>
                       </tr>
                     ))}
                   </tbody>

@@ -217,8 +217,10 @@ class TransactionImportServiceTest {
         assertThat(response.duplicates()).hasSize(1);
         assertThat(response.duplicates().getFirst().incoming().rowNumber()).isEqualTo(2);
         assertThat(response.duplicates().getFirst().incoming().description()).isEqualTo("Coffee");
+        assertThat(response.duplicates().getFirst().incoming().rawDescription()).isEqualTo("Coffee");
         assertThat(response.duplicates().getFirst().matchedTransaction().id()).isEqualTo(42);
         assertThat(response.duplicates().getFirst().matchedTransaction().rowNumber()).isNull();
+        assertThat(response.duplicates().getFirst().matchedTransaction().categoryId()).isEqualTo(2);
         verify(jdbcTemplate, never()).update(any(String.class), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
@@ -540,6 +542,11 @@ class TransactionImportServiceTest {
             }
 
             @Override
+            public String getRawDescription() {
+                return description;
+            }
+
+            @Override
             public BigDecimal getAmount() {
                 return amount;
             }
@@ -547,6 +554,16 @@ class TransactionImportServiceTest {
             @Override
             public TransactionDirection getDirection() {
                 return direction;
+            }
+
+            @Override
+            public Integer getCategoryId() {
+                return 2;
+            }
+
+            @Override
+            public Integer getTagId() {
+                return 3;
             }
         };
     }

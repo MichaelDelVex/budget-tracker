@@ -20,6 +20,7 @@ import com.budgettracker.domain.transaction.TransactionRepository;
 import com.budgettracker.importing.ImportBatchNotFoundException;
 import com.budgettracker.tag.TagNotFoundException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -66,11 +67,36 @@ public class TransactionService {
     }
 
     @Transactional
+    public TransactionResponse createTransaction(TransactionCreateRequest request) {
+        validateReferences(request.accountId(), request.categoryId(), request.tagId(), null);
+        validateDuplicateKey(
+            request.accountId(),
+            request.transactionDate(),
+            request.description(),
+            request.amount()
+        );
+
+        Transaction transaction = new Transaction(
+            request.accountId(),
+            request.transactionDate(),
+            request.description(),
+            request.rawDescription(),
+            request.amount(),
+            request.direction(),
+            request.categoryId(),
+            request.tagId(),
+            null
+        );
+
+        return TransactionResponse.from(transactionRepository.save(transaction));
+    }
+
+    @Transactional
     public TransactionResponse updateTransaction(Integer id, TransactionUpdateRequest request) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new TransactionNotFoundException(id));
 
-        validateReferences(request);
+        validateReferences(request.accountId(), request.categoryId(), request.tagId(), request.importBatchId());
         validateDuplicateKey(transaction, request);
 
         transaction.update(
@@ -119,21 +145,37 @@ public class TransactionService {
             .orElse(null);
     }
 
-    private void validateReferences(TransactionUpdateRequest request) {
-        if (!accountRepository.existsById(request.accountId())) {
-            throw new AccountNotFoundException(request.accountId());
+    private void validateReferences(Integer accountId, Integer categoryId, Integer tagId, Integer importBatchId) {
+        if (!accountRepository.existsById(accountId)) {
+            throw new AccountNotFoundException(accountId);
         }
 
-        if (request.categoryId() != null && !categoryRepository.existsById(request.categoryId())) {
-            throw new CategoryNotFoundException(request.categoryId());
+        if (categoryId != null && !categoryRepository.existsById(categoryId)) {
+            throw new CategoryNotFoundException(categoryId);
         }
 
-        if (request.tagId() != null && !tagRepository.existsById(request.tagId())) {
-            throw new TagNotFoundException(request.tagId());
+        if (tagId != null && !tagRepository.existsById(tagId)) {
+            throw new TagNotFoundException(tagId);
         }
 
-        if (request.importBatchId() != null && !importBatchRepository.existsById(request.importBatchId())) {
-            throw new ImportBatchNotFoundException(request.importBatchId());
+        if (importBatchId != null && !importBatchRepository.existsById(importBatchId)) {
+            throw new ImportBatchNotFoundException(importBatchId);
+        }
+    }
+
+    private void validateDuplicateKey(
+        Integer accountId,
+        LocalDate transactionDate,
+        String description,
+        BigDecimal amount
+    ) {
+        if (transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+            accountId,
+            transactionDate,
+            description,
+            amount
+        )) {
+            throw new TransactionDuplicateException();
         }
     }
 

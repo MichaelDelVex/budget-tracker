@@ -85,8 +85,11 @@ export interface ImportDuplicateTransaction {
   rowNumber: number | null;
   transactionDate: string;
   description: string;
+  rawDescription: string;
   amount: number;
   direction: TransactionDirection;
+  categoryId: number | null;
+  tagId: number | null;
 }
 
 export interface ImportDuplicate {

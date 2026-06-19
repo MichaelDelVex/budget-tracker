@@ -84,6 +84,40 @@ class TransactionServiceTest {
     }
 
     @Test
+    void createsManualTransaction() {
+        TransactionCreateRequest request = createRequest("Coffee #2");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction transaction = invocation.getArgument(0);
+            ReflectionTestUtils.setField(transaction, "id", 10);
+            return transaction;
+        });
+
+        TransactionResponse response = transactionService.createTransaction(request);
+
+        assertThat(response.id()).isEqualTo(10);
+        assertThat(response.description()).isEqualTo("Coffee #2");
+        assertThat(response.rawDescription()).isEqualTo("COFFEE SHOP");
+    }
+
+    @Test
+    void rejectsManualTransactionWithDuplicateKey() {
+        TransactionCreateRequest request = createRequest("Coffee");
+        when(accountRepository.existsById(1)).thenReturn(true);
+        when(transactionRepository.existsByAccountIdAndTransactionDateAndDescriptionAndAmount(
+            request.accountId(),
+            request.transactionDate(),
+            request.description(),
+            request.amount()
+        )).thenReturn(true);
+
+        assertThatThrownBy(() -> transactionService.createTransaction(request))
+            .isInstanceOf(TransactionDuplicateException.class);
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
     void throwsWhenTransactionIsMissing() {
         when(transactionRepository.findById(99)).thenReturn(Optional.empty());
 
@@ -259,6 +293,19 @@ class TransactionServiceTest {
             categoryId,
             tagId,
             importBatchId
+        );
+    }
+
+    private static TransactionCreateRequest createRequest(String description) {
+        return new TransactionCreateRequest(
+            1,
+            LocalDate.of(2026, 1, 10),
+            description,
+            "COFFEE SHOP",
+            new BigDecimal("4.50"),
+            TransactionDirection.EXPENSE,
+            null,
+            null
         );
     }
 }

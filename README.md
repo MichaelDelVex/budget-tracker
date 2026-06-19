@@ -194,6 +194,7 @@ Transactions:
 ```http
 GET /api/transactions
 GET /api/transactions/{id}
+POST /api/transactions
 PUT /api/transactions/{id}
 DELETE /api/transactions/{id}
 ```

@@ -33,8 +33,11 @@ public interface TransactionRepository
             transaction.id as id,
             transaction.transactionDate as transactionDate,
             transaction.description as description,
+            transaction.rawDescription as rawDescription,
             transaction.amount as amount,
-            transaction.direction as direction
+            transaction.direction as direction,
+            transaction.categoryId as categoryId,
+            transaction.tagId as tagId
         from Transaction transaction
         where transaction.accountId = :accountId
             and transaction.transactionDate between :dateFrom and :dateTo

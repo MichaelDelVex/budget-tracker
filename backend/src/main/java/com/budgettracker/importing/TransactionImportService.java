@@ -169,13 +169,13 @@ public class TransactionImportService {
             if (matchedTransaction != null) {
                 duplicateCount++;
                 duplicates.add(new ImportDuplicateResponse(
-                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.amount(), row.direction()),
+                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.rawDescription(), row.amount(), row.direction(), null, null),
                     matchedTransaction
                 ));
             } else {
                 seenInCurrentImport.put(
                     key,
-                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.amount(), row.direction())
+                    duplicateResponse(null, row.rowNumber(), row.transactionDate(), description, row.rawDescription(), row.amount(), row.direction(), null, null)
                 );
                 importableRows.add(row);
             }
@@ -212,8 +212,11 @@ public class TransactionImportService {
                 null,
                 match.getTransactionDate(),
                 match.getDescription(),
+                match.getRawDescription(),
                 match.getAmount(),
-                match.getDirection()
+                match.getDirection(),
+                match.getCategoryId(),
+                match.getTagId()
             ));
         }
 
@@ -411,16 +414,22 @@ public class TransactionImportService {
         Integer rowNumber,
         LocalDate transactionDate,
         String description,
+        String rawDescription,
         BigDecimal amount,
-        TransactionDirection direction
+        TransactionDirection direction,
+        Integer categoryId,
+        Integer tagId
     ) {
         return new ImportDuplicateTransactionResponse(
             id,
             rowNumber,
             transactionDate,
             description,
+            rawDescription,
             amount,
-            direction
+            direction,
+            categoryId,
+            tagId
         );
     }
 

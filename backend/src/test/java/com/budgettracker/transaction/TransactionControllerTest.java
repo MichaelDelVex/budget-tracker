@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -116,6 +117,30 @@ class TransactionControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.categoryId").value(2))
             .andExpect(jsonPath("$.tagId").value(3));
+    }
+
+    @Test
+    void createsTransaction() throws Exception {
+        when(transactionService.createTransaction(
+            org.mockito.ArgumentMatchers.any(TransactionCreateRequest.class)
+        )).thenReturn(response());
+
+        mockMvc.perform(post("/api/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "accountId": 1,
+                      "transactionDate": "2026-01-10",
+                      "description": "Coffee #2",
+                      "rawDescription": "COFFEE SHOP",
+                      "amount": 4.50,
+                      "direction": "EXPENSE",
+                      "categoryId": 2,
+                      "tagId": 3
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.description").value("Coffee"));
     }
 
     @Test

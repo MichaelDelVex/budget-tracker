@@ -193,6 +193,29 @@
           "response": []
         },
         {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Manual transaction creation. Used by the app when adding a reviewed duplicate anyway with a distinct description.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": 1,\n  \"transactionDate\": \"2026-01-10\",\n  \"description\": \"Coffee #2\",\n  \"rawDescription\": \"COFFEE SHOP\",\n  \"amount\": 4.50,\n  \"direction\": \"EXPENSE\",\n  \"categoryId\": 2,\n  \"tagId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Update Transaction",
           "request": {
             "method": "PUT",

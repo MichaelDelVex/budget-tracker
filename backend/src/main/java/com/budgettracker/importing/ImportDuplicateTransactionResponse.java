@@ -9,7 +9,10 @@ public record ImportDuplicateTransactionResponse(
     Integer rowNumber,
     LocalDate transactionDate,
     String description,
+    String rawDescription,
     BigDecimal amount,
-    TransactionDirection direction
+    TransactionDirection direction,
+    Integer categoryId,
+    Integer tagId
 ) {
 }

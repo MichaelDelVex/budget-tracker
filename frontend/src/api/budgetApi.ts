@@ -149,6 +149,24 @@ export function updateTransaction(transaction: Transaction) {
   });
 }
 
+export interface TransactionCreatePayload {
+  accountId: number;
+  transactionDate: string;
+  description: string;
+  rawDescription: string;
+  amount: number;
+  direction: Transaction['direction'];
+  categoryId: number | null;
+  tagId: number | null;
+}
+
+export function createTransaction(payload: TransactionCreatePayload) {
+  return request<Transaction>('/api/transactions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function importTransactions(accountId: string, file: File) {
   const data = new FormData();
   data.append('accountId', accountId);

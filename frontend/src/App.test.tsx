@@ -278,6 +278,52 @@ describe('App', () => {
     expect(within(duplicates).getAllByText(/coffee shop/i)).toHaveLength(2);
   });
 
+  it('adds a duplicate transaction anyway with an edited description', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
+    vi.spyOn(window, 'prompt').mockReturnValue('Coffee Shop second visit');
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    const duplicates = await screen.findByLabelText(/duplicate transactions/i);
+    await user.click(within(duplicates).getByRole('button', { name: /add anyway/i }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(fetch).mock.calls.find(([url, options]) =>
+        url.toString() === '/api/transactions' && options?.method === 'POST'
+      );
+      expect(createCall).toBeDefined();
+      const body = JSON.parse(createCall?.[1]?.body as string);
+      expect(body.description).toBe('Coffee Shop second visit');
+      expect(body.categoryId).toBe(2);
+      expect(body.tagId).toBe(3);
+    });
+  });
+
+  it('does not add a duplicate transaction when add anyway is cancelled', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
+    vi.spyOn(window, 'prompt').mockReturnValue(null);
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }));
+    await user.selectOptions(await screen.findByLabelText(/account/i), '1');
+    await user.upload(screen.getByLabelText(/csv file/i), file);
+    await user.click(screen.getByRole('button', { name: /import transactions/i }));
+
+    const duplicates = await screen.findByLabelText(/duplicate transactions/i);
+    await user.click(within(duplicates).getByRole('button', { name: /add anyway/i }));
+
+    expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
+      url.toString() === '/api/transactions' && options?.method === 'POST'
+    )).toBe(false);
+  });
+
+
   it('displays unmatched CSV categories after import', async () => {
     const user = userEvent.setup();
     const file = new File(['Date,Description,Amount'], 'transactions.csv', { type: 'text/csv' });
@@ -523,6 +569,14 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
     return json(propertyReport);
   }
   if (url.startsWith('/api/transactions')) {
+    if (options?.method === 'POST') {
+      return json({
+        ...transactions.content[0],
+        id: 99,
+        description: 'Coffee Shop second visit',
+        rawDescription: 'Coffee Shop',
+      });
+    }
     return json(transactions);
   }
   if (url.startsWith('/api/imports/transactions')) {
@@ -539,16 +593,22 @@ async function mockFetch(input: RequestInfo | URL, options?: RequestInit) {
           rowNumber: 2,
           transactionDate: '2026-01-10',
           description: 'Coffee Shop',
+          rawDescription: 'Coffee Shop',
           amount: 4.5,
           direction: 'EXPENSE',
+          categoryId: null,
+          tagId: null,
         },
         matchedTransaction: {
           id: 5,
           rowNumber: null,
           transactionDate: '2026-01-10',
           description: 'Coffee Shop',
+          rawDescription: 'Coffee Shop',
           amount: 4.5,
           direction: 'EXPENSE',
+          categoryId: 2,
+          tagId: 3,
         },
       }],
     });
