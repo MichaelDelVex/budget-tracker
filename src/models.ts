@@ -7,6 +7,7 @@ export interface Transaction {
     description: string;
     amount: number;
     category: string;
+    transactionType: string;
     status: string;
     currency: string;
 }

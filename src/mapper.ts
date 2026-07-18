@@ -13,6 +13,7 @@ export function mapNabTransaction(
         description: raw.narrative,
         amount: Number(raw.amount),
         category: raw.category?.title ?? "UNCATEGORISED",
+        transactionType: raw.transactionType,
         status: raw.processingStatus,
         currency: raw.currency
     };

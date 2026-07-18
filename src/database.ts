@@ -18,6 +18,7 @@ export function initialiseDatabase(){
             category TEXT,
             status TEXT,
             currency TEXT,
+            transaction_type TEXT,
             imported_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     `);
