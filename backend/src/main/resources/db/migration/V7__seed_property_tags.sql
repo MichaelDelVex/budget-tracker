@@ -1,9 +1,0 @@
-INSERT OR IGNORE INTO tag (name, color, created_at, updated_at)
-VALUES
-    ('Rental Income', '#2f855a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Mortgage', '#b45309', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Insurance', '#355f8a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Rates', '#7c3aed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Repairs', '#be123c', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Property Management', '#0f766e', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Other Property Expense', '#51606f', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
