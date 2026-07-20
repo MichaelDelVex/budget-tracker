@@ -1,12 +1,14 @@
 import { initialiseDatabase } from "./database";
+import { seedCategories } from "./categories";
+import { seedMerchantRules } from "./merchantResolver";
 import { importNabJson } from "./import";
 
-console.log("Starting import");
-
 initialiseDatabase();
+
+seedCategories();
+
+seedMerchantRules();
 
 importNabJson(
     "./data/nab-response.json"
 );
-
-console.log("Import complete");

@@ -1,6 +1,7 @@
 import fs from "fs";
 import { db } from "./database";
 import { mapNabTransaction } from "./mapper";
+import { resolveCategory } from "./categoryResolver";
 
 export function importNabJson(filename: string) {
     const file = fs.readFileSync(filename, "utf8");
@@ -25,7 +26,7 @@ export function importNabJson(filename: string) {
             merchant,
             description,
             amount,
-            category,
+            category_id,
             transaction_type,
             status,
             currency
@@ -38,7 +39,7 @@ export function importNabJson(filename: string) {
             @merchant,
             @description,
             @amount,
-            @category,
+            @category_id,
             @transactionType,
             @status,
             @currency
@@ -54,7 +55,7 @@ export function importNabJson(filename: string) {
             merchant = @merchant,
             description = @description,
             amount = @amount,
-            category = @category,
+            category_id = @category_id,
             transaction_type = @transactionType,
             status = @status,
             currency = @currency
@@ -68,6 +69,7 @@ export function importNabJson(filename: string) {
     const processTransactions = db.transaction((items: any[]) => {
         for (const item of items) {
             const transaction = mapNabTransaction(item);
+            transaction.category_id = resolveCategory(transaction.merchant);
 
             const existing = checkExisting.get(transaction.id);
 

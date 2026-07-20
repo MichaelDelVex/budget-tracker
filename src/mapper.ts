@@ -12,7 +12,7 @@ export function mapNabTransaction(
         merchant: raw.merchant?.title ?? "Unknown",
         description: raw.narrative,
         amount: Number(raw.amount),
-        category: raw.category?.title ?? "UNCATEGORISED",
+        category_id: raw.category?.id ?? "Uncategorised",
         transactionType: raw.transactionType,
         status: raw.processingStatus,
         currency: raw.currency

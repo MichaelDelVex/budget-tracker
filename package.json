@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "view": "tsx src/view.ts"
+    "confirmTransactions": "tsx src/review.ts",
+    "confirmRules": "tsx src/rulesView.ts",
+    "seedRules": "tsx src/seedRules.ts"
   },
   "repository": {
     "type": "git",

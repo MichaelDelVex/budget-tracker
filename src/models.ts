@@ -6,7 +6,7 @@ export interface Transaction {
     merchant: string;
     description: string;
     amount: number;
-    category: string;
+    category_id: number;
     transactionType: string;
     status: string;
     currency: string;
